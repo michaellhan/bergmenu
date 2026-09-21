@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Annenberg Menu</title>
+  <meta name="description" content="What's new on the Annenberg dining hall menu this week.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23a51c30'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Annenberg</h1>
+      <p class="sub">What's changing this week</p>
+    </div>
+    <nav class="controls" aria-label="View controls">
+      <div class="weeknav">
+        <button id="prev" class="icon" aria-label="Previous week">&#8249;</button>
+        <span id="range" class="range">&nbsp;</span>
+        <button id="next" class="icon" aria-label="Next week">&#8250;</button>
+      </div>
+      <div class="chips" id="meals" role="group" aria-label="Meals">
+        <button class="chip on" data-meal="Breakfast">Breakfast</button>
+        <button class="chip on" data-meal="Lunch">Lunch</button>
+        <button class="chip on" data-meal="Dinner">Dinner</button>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="all">
+        <span>Show everything</span>
+      </label>
+    </nav>
+  </header>
+
+  <div class="daytabs" id="daytabs" role="tablist" aria-label="Days"></div>
+
+  <main id="grid" class="grid" aria-live="polite">
+    <p class="loading">Loading menu…</p>
+  </main>
+
+  <footer class="foot">
+    <span class="legend">
+      <i class="tag vegan"></i> Vegan
+      <i class="tag vegetarian"></i> Vegetarian
+      <i class="tag halal"></i> Halal
+    </span>
+    <span id="updated"></span>
+    <a id="source" href="https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx?sName=HARVARD+UNIVERSITY+DINING+SERVICES&locationNum=30&locationName=Annenberg&naFlag=1&WeeksMenus=This+Week%27s+Menus&myaction=read" target="_blank" rel="noopener">Full menu on HUDS ↗</a>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

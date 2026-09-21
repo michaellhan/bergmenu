@@ -1,0 +1,33 @@
+# Annenberg menu
+
+A one-page site showing only what changes day to day on the Annenberg (HUDS)
+menu. Staples that appear every day (salad bar, grill, deli, yogurt bar, etc.)
+are hidden unless you tick **Show everything**.
+
+- `scrape.py` pulls this week and next from the HUDS FoodPro site into `data/menu.json` (stdlib only).
+- `index.html`, `style.css`, `app.js` render it. No build step.
+- `.github/workflows/update.yml` re-scrapes every morning at 5 AM Eastern and publishes to GitHub Pages.
+
+## Run locally
+
+```bash
+python3 scrape.py
+python3 -m http.server 8000
+```
+
+Then open http://localhost:8000.
+
+## Deploy
+
+1. Push this folder to a GitHub repo.
+2. In the repo settings, under **Pages**, set the source to **GitHub Actions**.
+3. Run the "Update menu & deploy" workflow once (or just wait for the next push/schedule).
+
+## How "staples" are decided
+
+An item is hidden by default if either:
+
+- its station is in `STAPLE_CATEGORIES` in `scrape.py` (always-there stations), or
+- it appears in the same meal on at least 6 of the 7 days that week.
+
+Tweak the list or the threshold in `scrape.py` if something is being hidden that shouldn't be.

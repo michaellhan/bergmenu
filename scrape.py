@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""Scrape the Annenberg (HUDS) menu for this week and next into data/menu.json.
+
+Stdlib only. Run:  python3 scrape.py
+"""
+import collections
+import datetime as dt
+import html
+import json
+import re
+import sys
+import time
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+BASE = "https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx"
+PARAMS = {
+    "sName": "HARVARD UNIVERSITY DINING SERVICES",
+    "locationNum": "30",
+    "locationName": "Annenberg",
+    "naFlag": "1",
+    "WeeksMenus": "This Week's Menus",
+    "myaction": "read",
+}
+TZ = ZoneInfo("America/New_York")
+OUT = Path(__file__).parent / "data" / "menu.json"
+WEEKS_AHEAD = 1  # this week + N more
+
+# Stations whose contents are essentially the same every day. Items in these
+# categories are flagged as staples (hidden by default on the site).
+STAPLE_CATEGORIES = {
+    "salad bar", "sand/ deli", "from the grill", "gut health station",
+    "brown rice station", "fresh fruit", "bagel", "build your own",
+    "featured special bar", "bread choices",
+}
+# An item is also a staple if it shows up in the same meal on at least this
+# many days of a week (when the week has enough data to judge).
+STAPLE_MIN_DAYS = 6
+MEAL_ORDER = ["Breakfast", "Lunch", "Dinner"]
+
+
+def menu_url(d: dt.date) -> str:
+    q = dict(PARAMS, dtdate=f"{d.month}/{d.day}/{d.year}")
+    return BASE + "?" + urllib.parse.urlencode(q)
+
+
+def fetch(url: str, tries: int = 4) -> str:
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "bergmenu/1.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read().decode("latin-1")
+        except Exception as e:  # noqa: BLE001
+            last = e
+            time.sleep(2 * (i + 1))
+    raise RuntimeError(f"failed to fetch {url}: {last}")
+
+
+def clean(s: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(s).replace("\xa0", " ")).strip()
+
+
+def parse_day(page: str) -> list[dict]:
+    """Return [{name, categories: [{name, items: [{name, tags}]}]}] for one day."""
+    meals = []
+    parts = re.split(r'mealName=([A-Za-z+]+)"', page)
+    for i in range(1, len(parts), 2):
+        meal = clean(parts[i].replace("+", " ")).replace(" Menu", "")
+        body = parts[i + 1]
+        cats: "collections.OrderedDict[str, list]" = collections.OrderedDict()
+        cur = None
+        pat = re.compile(
+            r"shortmenucats\"><span[^>]*>--\s*(.*?)\s*--</span>"
+            r"|shortmenurecipes'><span[^>]*>(.*?)</span>(.*?)</table>",
+            re.S,
+        )
+        for m in pat.finditer(body):
+            if m.group(1) is not None:
+                cur = clean(m.group(1))
+                cats.setdefault(cur, [])
+                continue
+            name, tail = clean(m.group(2)), m.group(3)
+            tags = []
+            if "vgn.gif" in tail:
+                tags.append("vegan")
+            elif "veg.gif" in tail:
+                tags.append("vegetarian")
+            if re.search(r"\(\s*H\s*\)\s*$", name):
+                name = re.sub(r"\s*\(\s*H\s*\)\s*$", "", name)
+                tags.append("halal")
+            if cur is None:
+                cur = "Other"
+                cats.setdefault(cur, [])
+            if name and name not in {x["name"] for x in cats[cur]}:
+                cats[cur].append({"name": name, "tags": tags})
+        meals.append({
+            "name": meal,
+            "categories": [{"name": c, "items": v} for c, v in cats.items() if v],
+        })
+    meals.sort(key=lambda m: MEAL_ORDER.index(m["name"]) if m["name"] in MEAL_ORDER else 99)
+    return meals
+
+
+def mark_halal_dupes(meals: list[dict]) -> None:
+    """The 'Halal' station repeats entrees listed elsewhere; fold them in."""
+    for meal in meals:
+        halal = next((c for c in meal["categories"] if c["name"].lower() == "halal"), None)
+        if not halal:
+            continue
+        others = {it["name"]: it for c in meal["categories"] if c is not halal for it in c["items"]}
+        keep = []
+        for it in halal["items"]:
+            if it["name"] in others:
+                o = others[it["name"]]
+                if "halal" not in o["tags"]:
+                    o["tags"].append("halal")
+            else:
+                if "halal" not in it["tags"]:
+                    it["tags"].append("halal")
+                keep.append(it)
+        halal["items"] = keep
+        if not keep:
+            meal["categories"].remove(halal)
+
+
+def flag_staples(days: list[dict]) -> None:
+    """Flag items that are the same every day so the site can hide them."""
+    counts: dict[tuple[str, str], int] = collections.Counter()
+    meal_days: dict[str, int] = collections.Counter()
+    for d in days:
+        for meal in d["meals"]:
+            meal_days[meal["name"]] += 1
+            seen = set()
+            for c in meal["categories"]:
+                for it in c["items"]:
+                    seen.add((meal["name"], it["name"]))
+            for k in seen:
+                counts[k] += 1
+    # Anything that is a staple somewhere (e.g. a breakfast staple that shows
+    # up under weekend brunch) is treated as a staple everywhere.
+    staple_names = set()
+    for (meal_name, item_name), c in counts.items():
+        n = meal_days[meal_name]
+        if n >= 5 and c >= min(STAPLE_MIN_DAYS, n):
+            staple_names.add(item_name)
+    for d in days:
+        for meal in d["meals"]:
+            for c in meal["categories"]:
+                if c["name"].lower() in STAPLE_CATEGORIES:
+                    staple_names.update(it["name"] for it in c["items"])
+    for d in days:
+        for meal in d["meals"]:
+            for c in meal["categories"]:
+                c["staple"] = c["name"].lower() in STAPLE_CATEGORIES
+                for it in c["items"]:
+                    it["staple"] = c["staple"] or it["name"] in staple_names
+
+
+def main() -> int:
+    today = dt.datetime.now(TZ).date()
+    monday = today - dt.timedelta(days=today.weekday())
+    dates = [monday + dt.timedelta(days=i) for i in range(7 * (WEEKS_AHEAD + 1))]
+
+    with ThreadPoolExecutor(max_workers=7) as ex:
+        pages = list(ex.map(lambda d: fetch(menu_url(d)), dates))
+
+    weeks = []
+    for w in range(WEEKS_AHEAD + 1):
+        days = []
+        for d, page in zip(dates[w * 7:(w + 1) * 7], pages[w * 7:(w + 1) * 7]):
+            meals = parse_day(page)
+            mark_halal_dupes(meals)
+            days.append({
+                "date": d.isoformat(),
+                "weekday": d.strftime("%A"),
+                "meals": meals,
+                "url": menu_url(d),
+            })
+        flag_staples(days)
+        if any(d["meals"] for d in days):
+            weeks.append({"start": days[0]["date"], "end": days[-1]["date"], "days": days})
+
+    if not weeks or not any(d["meals"] for d in weeks[0]["days"]):
+        print("no menu data found; leaving existing file untouched", file=sys.stderr)
+        return 1
+
+    out = {
+        "location": "Annenberg",
+        "generated": dt.datetime.now(TZ).isoformat(timespec="seconds"),
+        "source": menu_url(today),
+        "weeks": weeks,
+    }
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
+    n_items = sum(len(c["items"]) for w in weeks for d in w["days"] for m in d["meals"] for c in m["categories"])
+    print(f"wrote {OUT} ({len(weeks)} weeks, {n_items} items)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

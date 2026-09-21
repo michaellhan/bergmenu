@@ -1,0 +1,43 @@
+name: Update menu & deploy
+
+on:
+  schedule:
+    # 5:00 AM Eastern (09:00 UTC) every day, so the new week is picked up
+    # Monday morning and any mid-week menu changes get refreshed too.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scrape HUDS
+        run: python3 scrape.py
+      - name: Commit updated data
+        run: |
+          git config user.name "menu-bot"
+          git config user.email "menu-bot@users.noreply.github.com"
+          git add data/menu.json
+          git diff --cached --quiet || git commit -m "Update menu $(date -u +%F)"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploy
+        uses: actions/deploy-pages@v4

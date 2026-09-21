@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/mhan/Desktop/bergmenu && exec python3 -m http.server 8123"],
+      "port": 8123
+    }
+  ]
+}
