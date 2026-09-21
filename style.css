@@ -81,6 +81,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   border: 1px solid var(--line); color: var(--muted);
 }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip:hover:not(.on) { color: var(--ink); }
 .toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); cursor: pointer; user-select: none; }
 .toggle input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 
@@ -129,26 +130,27 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .dayhead .wd { font-weight: 600; font-size: 15px; }
 .dayhead .dt { color: var(--muted); font-variant-numeric: tabular-nums; }
 .day.today .wd { color: var(--accent); }
+.day { padding-bottom: 12px; }
 .pill {
   font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 999px;
 }
 
-.meal { padding: 10px 0 6px; }
-.meal + .meal { border-top: 1px dashed var(--line); }
-.meal h3 {
-  margin: 0 0 6px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--muted);
+.grp { padding: 8px 0 2px; }
+.grp h4 {
+  margin: 0 0 3px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--faint);
 }
-.cat { margin: 0 0 8px; }
-.cat h4 { margin: 0 0 1px; font-size: 11.5px; font-weight: 500; color: var(--faint); }
-.cat ul { list-style: none; margin: 0; padding: 0; }
-.cat li { display: flex; align-items: baseline; gap: 6px; padding: 1.5px 0; }
-.cat li span { min-width: 0; overflow-wrap: anywhere; }
-.cat.staple, li.staple { display: none; }
-.showall .cat.staple, .showall li.staple { display: revert; }
-.showall li.staple { color: var(--muted); }
+.grp ul { list-style: none; margin: 0; padding: 0; }
+.grp li { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
+.grp li span { min-width: 0; overflow-wrap: anywhere; }
+.grp.staples li { color: var(--muted); }
+.more {
+  display: block; margin: 8px 0 2px; padding: 0;
+  font-size: 12px; color: var(--muted);
+}
+.more:hover { color: var(--accent); }
 .tags { display: inline-flex; gap: 3px; flex: 0 0 auto; transform: translateY(-1px); }
 .tag {
   display: inline-block; width: 6px; height: 6px; border-radius: 50%;
