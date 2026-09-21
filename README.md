@@ -19,9 +19,14 @@ Then open http://localhost:8000.
 
 ## Deploy
 
-1. Push this folder to a GitHub repo.
-2. In the repo settings, under **Pages**, set the source to **GitHub Actions**.
-3. Run the "Update menu & deploy" workflow once (or just wait for the next push/schedule).
+The site lives at https://www.michael-han.com/berg/, served from the `berg/`
+folder of the `michaellhan/michaellhan.github.io` repo. The GitHub Action
+re-scrapes every morning and pushes the result there using a deploy key
+(`SITE_DEPLOY_KEY` secret). To publish by hand:
+
+```bash
+scripts/deploy.sh
+```
 
 ## How "staples" are decided
 
