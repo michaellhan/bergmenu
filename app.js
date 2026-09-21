@@ -5,12 +5,12 @@
   const prev = $("#prev"), next = $("#next"), allBox = $("#all");
   const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set() };
 
-  // Collapse HUDS's many stations into a few groups. Soup and mains show by
-  // default; the rest sits behind a "more" link.
+  // Collapse HUDS's many stations into a few groups. Mains (unlabelled, at the
+  // top) and soup show by default; the rest sits behind a "more" link.
   const GROUPS = [
-    ["Soup", ["today's soup"]],
     ["Mains", ["entrees", "veg,vegan", "halal", "plant protein", "brunch", "chili bar/stew",
                "breakfast entrees", "breakfast meats", "breakfast bakery"]],
+    ["Soup", ["today's soup"]],
     ["Sides", ["starch and potatoes", "vegetables", "sides", "whole grain pasta bar", "bread choices"]],
     ["Sweets", ["desserts", "brain break", "delish", "miscellaneous"]],
   ];
