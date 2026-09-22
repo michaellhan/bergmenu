@@ -7,9 +7,6 @@
   --line: #e7e5e4;
   --accent: #a51c30;
   --accent-soft: rgba(165, 28, 48, 0.08);
-  --vegan: #3f8f5a;
-  --vegetarian: #c98a1c;
-  --halal: #4b6bd6;
   --radius: 12px;
   --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -23,15 +20,11 @@
     --line: #2b2826;
     --accent: #e0546a;
     --accent-soft: rgba(224, 84, 106, 0.14);
-    --vegan: #6fbf87;
-    --vegetarian: #e0aa46;
-    --halal: #8ea3ee;
   }
 }
 :root[data-theme="dark"] {
   --bg: #131211; --panel: #1c1a19; --ink: #ece9e6; --muted: #9c948e; --faint: #6b645f;
   --line: #2b2826; --accent: #e0546a; --accent-soft: rgba(224, 84, 106, 0.14);
-  --vegan: #6fbf87; --vegetarian: #e0aa46; --halal: #8ea3ee;
 }
 
 * { box-sizing: border-box; }
@@ -168,16 +161,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   font-size: 12px; color: var(--muted);
 }
 .more:hover { color: var(--accent); }
-.tags { display: inline-flex; gap: 3px; flex: 0 0 auto; transform: translateY(-1px); }
-.tag {
-  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-  background: var(--faint);
-}
-.tag.vegan { background: var(--vegan); }
-.tag.vegetarian { background: var(--vegetarian); }
-.tag.halal { background: var(--halal); }
-.legend .tag { margin: 0 3px 0 10px; }
-.legend .tag:first-child { margin-left: 0; }
 .none { color: var(--faint); font-style: italic; }
 
 /* footer */

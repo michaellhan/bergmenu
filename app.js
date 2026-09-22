@@ -61,11 +61,6 @@
   function itemLi(it) {
     const li = el("li", it.staple ? "staple" : "");
     li.append(el("span", null, it.name));
-    if (it.tags.length) {
-      const t = el("span", "tags");
-      for (const tag of it.tags) { const i = el("i", "tag " + tag); i.title = tag; t.append(i); }
-      li.append(t);
-    }
     return li;
   }
 
