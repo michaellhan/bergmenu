@@ -241,14 +241,22 @@
   for (const chip of document.querySelectorAll(".chip")) {
     chip.onclick = () => { state.meal = chip.dataset.meal; state.q = ""; q.value = ""; render(); };
   }
-  // swipe between days on phones
-  let sx = 0, sy = 0;
-  grid.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
-  grid.addEventListener("touchend", (e) => {
-    if (state.q || !matchMedia("(max-width: 860px)").matches) return;
-    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) goDay(dx < 0 ? 1 : -1);
+  // swipe between days on phones: pointer events cover touch, pen and mouse
+  const phone = matchMedia("(max-width: 860px)");
+  let swipe = null;
+  document.addEventListener("pointerdown", (e) => {
+    swipe = null;
+    if (!phone.matches || state.q || !state.data) return;
+    if (e.target.closest("input, button, .top, .daytabs")) return;
+    swipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
   }, { passive: true });
+  document.addEventListener("pointerup", (e) => {
+    if (!swipe || e.pointerId !== swipe.id) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) goDay(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  document.addEventListener("pointercancel", () => { swipe = null; }, { passive: true });
   let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };
