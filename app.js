@@ -30,9 +30,9 @@
   };
 
   const nowParts = () => {
-    const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(new Date());
+    const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
     const g = (t) => p.find((x) => x.type === t).value;
-    return { iso: `${g("year")}-${g("month")}-${g("day")}`, hour: Number(g("hour")) % 24 };
+    return { iso: `${g("year")}-${g("month")}-${g("day")}`, mins: (Number(g("hour")) % 24) * 60 + Number(g("minute")) };
   };
   const todayISO = () => nowParts().iso;
   const parse = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -41,14 +41,29 @@
   try { allBox.checked = localStorage.getItem("berg.all") === "1"; } catch (_) {}
   document.body.classList.toggle("showall", allBox.checked);
 
+  const addDays = (iso, n) => { const d = parse(iso); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
+
+  // Open on the next meal still to come: breakfast ends 10:30, lunch 2:30,
+  // dinner 7:30. After dinner, jump ahead to tomorrow's breakfast.
   function pickDefaults() {
-    const { iso: t, hour } = nowParts();
-    state.meal = hour < 10 ? "Breakfast" : hour < 15 ? "Lunch" : "Dinner";
-    const i = state.data.weeks.findIndex((w) => t >= w.start && t <= w.end);
-    state.week = i >= 0 ? i : (t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1);
-    const days = state.data.weeks[state.week].days;
-    const di = days.findIndex((d) => d.date === t);
-    state.day = di >= 0 ? di : 0;
+    const { iso: t, mins } = nowParts();
+    let target = t;
+    if (mins < 10 * 60 + 30) state.meal = "Breakfast";
+    else if (mins < 14 * 60 + 30) state.meal = "Lunch";
+    else if (mins < 19 * 60 + 30) state.meal = "Dinner";
+    else { state.meal = "Breakfast"; target = addDays(t, 1); }
+    const locate = (iso) => {
+      const wi = state.data.weeks.findIndex((w) => iso >= w.start && iso <= w.end);
+      if (wi < 0) return false;
+      const di = state.data.weeks[wi].days.findIndex((d) => d.date === iso);
+      if (di < 0) return false;
+      state.week = wi; state.day = di;
+      return true;
+    };
+    if (!locate(target) && !locate(t)) {
+      state.week = t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1;
+      state.day = 0;
+    }
   }
 
   function el(tag, cls, text) {
@@ -164,6 +179,14 @@
   };
 
   const goWeek = (i) => { if (i >= 0 && i < state.data.weeks.length) { state.week = i; state.day = 0; render(); } };
+  // step one day, crossing into the next or previous week at the ends
+  const goDay = (delta) => {
+    const n = state.data.weeks[state.week].days.length;
+    const d = state.day + delta;
+    if (d >= 0 && d < n) { state.day = d; render(); }
+    else if (d >= n && state.week < state.data.weeks.length - 1) { state.week++; state.day = 0; render(); }
+    else if (d < 0 && state.week > 0) { state.week--; state.day = state.data.weeks[state.week].days.length - 1; render(); }
+  };
 
   function render() {
     const w = state.data.weeks[state.week];
@@ -218,6 +241,14 @@
   for (const chip of document.querySelectorAll(".chip")) {
     chip.onclick = () => { state.meal = chip.dataset.meal; state.q = ""; q.value = ""; render(); };
   }
+  // swipe between days on phones
+  let sx = 0, sy = 0;
+  grid.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  grid.addEventListener("touchend", (e) => {
+    if (state.q || !matchMedia("(max-width: 860px)").matches) return;
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) goDay(dx < 0 ? 1 : -1);
+  }, { passive: true });
   let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };

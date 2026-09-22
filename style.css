@@ -207,8 +207,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .daytab.today:not(.on) b { color: var(--accent); }
   .searching .daytabs { display: none; }
 
-  /* content: a flat list, no card */
-  .grid { display: block; }
+  /* content: a flat list, no card; swipe left/right to change day */
+  .grid { display: block; touch-action: pan-y; min-height: 40vh; }
   .day { display: none; border: 0; background: none; padding: 4px 0 0; box-shadow: none; opacity: 1; }
   .day.active { display: block; }
   .day.today { box-shadow: none; }
