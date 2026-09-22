@@ -6,19 +6,25 @@
   const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
 
   // Collapse HUDS's many stations into a few groups. Mains (unlabelled, at the
-  // top) and soup show by default; the rest sits behind a "more" link.
+  // top), soup and dessert show by default; sides and extras sit behind "more".
   const GROUPS = [
-    ["Mains", ["entrees", "veg,vegan", "halal", "plant protein", "brunch", "chili bar/stew",
+    ["Mains", ["entrees", "veg,vegan", "halal", "brunch", "chili bar/stew",
                "breakfast entrees", "breakfast meats", "breakfast bakery"]],
     ["Soup", ["today's soup"]],
-    ["Sides", ["starch and potatoes", "vegetables", "sides", "whole grain pasta bar", "bread choices"]],
-    ["Sweets", ["desserts", "delish", "miscellaneous"]],
+    ["Dessert", ["desserts", "miscellaneous"]],
+    ["Sides", ["plant protein", "starch and potatoes", "vegetables", "sides",
+               "whole grain pasta bar", "bread choices"]],
+    ["Extras", ["delish"]],
   ];
-  const DEFAULT_OPEN = new Set(["Mains", "Soup"]);
+  const DEFAULT_OPEN = new Set(["Mains", "Soup", "Dessert"]);
   // HUDS lists a fixed weekly Brain Break template, not the real nightly spread; skip it.
   const SKIP = new Set(["brain break"]);
-  const groupOf = (cat) => {
+  const BREAD = /cornbread|bread|roll|hawaiian|cracker|tortilla/i;
+  const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|cinnamon sugar|^banana$/i;
+  const groupOf = (cat, name) => {
     const c = cat.toLowerCase();
+    if (c === "chili bar/stew" && BREAD.test(name)) return "Sides";
+    if (c === "desserts" && TOPPING.test(name)) return "Extras";
     for (const [g, names] of GROUPS) if (names.includes(c)) return g;
     return "Sides";
   };
@@ -116,7 +122,7 @@
         if (seen.has(it.name)) continue;
         seen.add(it.name);
         if (c.staple || it.staple) { staples.push(it); continue; }
-        buckets.get(groupOf(c.name)).push(it);
+        buckets.get(groupOf(c.name, it.name)).push(it);
       }
     }
     const key = d.date + "|" + meal.name;
