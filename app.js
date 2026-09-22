@@ -12,7 +12,7 @@
                "breakfast entrees", "breakfast meats", "breakfast bakery"]],
     ["Soup", ["today's soup"]],
     ["Sides", ["starch and potatoes", "vegetables", "sides", "whole grain pasta bar", "bread choices"]],
-    ["Sweets", ["desserts", "brain break", "delish", "miscellaneous"]],
+    ["Sweets", ["desserts", "delish", "miscellaneous"]],
   ];
   const DEFAULT_OPEN = new Set(["Soup", "Mains"]);
   const groupOf = (cat) => {
@@ -35,7 +35,7 @@
 
   function pickDefaults() {
     const { iso: t, hour } = nowParts();
-    state.meal = hour < 10 ? "Breakfast" : hour < 15 ? "Lunch" : "Dinner";
+    state.meal = hour < 10 ? "Breakfast" : hour < 15 ? "Lunch" : hour < 21 ? "Dinner" : "Brain Break";
     const i = state.data.weeks.findIndex((w) => t >= w.start && t <= w.end);
     state.week = i >= 0 ? i : (t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1);
     const days = state.data.weeks[state.week].days;
@@ -70,6 +70,16 @@
     head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
     card.append(head);
 
+    // Brain Break is a late-night station listed under Dinner; give it its own view.
+    if (state.meal === "Brain Break") {
+      const dinner = d.meals.find((m) => m.name === "Dinner");
+      const bb = dinner && dinner.categories.find((c) => c.name.toLowerCase() === "brain break");
+      if (!bb || !bb.items.length) { card.append(el("p", "none", "No brain break")); return card; }
+      const ul = el("ul");
+      bb.items.forEach((it) => ul.append(itemLi({ ...it, staple: false })));
+      const sec = el("div", "grp"); sec.append(ul); card.append(sec);
+      return card;
+    }
     const meal = d.meals.find((m) => m.name === state.meal);
     if (!meal) { card.append(el("p", "none", d.meals.length ? "Not served" : "No menu posted")); return card; }
 
@@ -77,6 +87,7 @@
     const buckets = new Map(GROUPS.map(([g]) => [g, []]));
     const staples = [];
     for (const c of meal.categories) {
+      if (c.name.toLowerCase() === "brain break") continue;
       for (const it of c.items) {
         if (c.staple || it.staple) { staples.push(it); continue; }
         buckets.get(groupOf(c.name)).push(it);
