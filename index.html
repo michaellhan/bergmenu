@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <header class="top">
@@ -42,10 +42,6 @@
         <button class="chip" data-meal="Dinner">Dinner</button>
       </div>
       <input type="search" id="q" class="search" placeholder="Search" aria-label="Search the menu" autocomplete="off">
-      <label class="toggle">
-        <input type="checkbox" id="all">
-        <span>Show everything</span>
-      </label>
     </nav>
   </header>
 
@@ -61,10 +57,14 @@
       <i class="tag vegetarian"></i> Vegetarian
       <i class="tag halal"></i> Halal
     </span>
+    <label class="toggle">
+      <input type="checkbox" id="all">
+      <span>Show everything</span>
+    </label>
     <span id="updated"></span>
     <a id="source" href="https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx?sName=HARVARD+UNIVERSITY+DINING+SERVICES&locationNum=30&locationName=Annenberg&naFlag=1&WeeksMenus=This+Week%27s+Menus&myaction=read" target="_blank" rel="noopener">Full menu on HUDS ↗</a>
   </footer>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

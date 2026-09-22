@@ -3,7 +3,7 @@
   const $ = (s) => document.querySelector(s);
   const grid = $("#grid"), tabs = $("#daytabs"), range = $("#range");
   const prev = $("#prev"), next = $("#next"), allBox = $("#all"), q = $("#q");
-  const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "", favs: new Set() };
+  const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
 
   // Collapse HUDS's many stations into a few groups. Mains (unlabelled, at the
   // top) and soup show by default; the rest sits behind a "more" link.
@@ -32,11 +32,7 @@
   const parse = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
   const fmt = (iso, o) => parse(iso).toLocaleDateString("en-US", o);
 
-  // per-browser preferences
-  const load = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
-  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
-  allBox.checked = load("berg.all", false);
-  state.favs = new Set(load("berg.favs", []));
+  try { allBox.checked = localStorage.getItem("berg.all") === "1"; } catch (_) {}
   document.body.classList.toggle("showall", allBox.checked);
 
   function pickDefaults() {
@@ -57,41 +53,38 @@
   }
 
   function itemLi(it) {
-    const fav = state.favs.has(it.name);
-    const li = el("li", (it.staple ? "staple " : "") + (fav ? "fav" : ""));
+    const li = el("li", it.staple ? "staple" : "");
     li.append(el("span", null, it.name));
     if (it.tags.length) {
       const t = el("span", "tags");
       for (const tag of it.tags) { const i = el("i", "tag " + tag); i.title = tag; t.append(i); }
       li.append(t);
     }
-    const star = el("button", "star", fav ? "★" : "☆");
-    star.title = fav ? "Remove favorite" : "Favorite";
-    star.setAttribute("aria-label", star.title + ": " + it.name);
-    star.onclick = () => {
-      fav ? state.favs.delete(it.name) : state.favs.add(it.name);
-      save("berg.favs", [...state.favs]);
-      render();
-    };
-    li.append(star);
     return li;
+  }
+
+  function dayHead(d, today) {
+    const head = el("div", "dayhead");
+    head.append(el("span", "wd", d.weekday.slice(0, 3)));
+    head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
+    return head;
+  }
+  function dayCard(d, today) {
+    const card = el("article", "day");
+    if (d.date === today) card.classList.add("today");
+    else if (d.date < today) card.classList.add("past");
+    card.append(dayHead(d, today));
+    return card;
   }
 
   const matches = (name) => name.toLowerCase().includes(state.q);
 
   // Search mode: every meal, staples included, one card per day with hits.
   function renderSearchDay(d, today) {
-    const card = el("article", "day");
-    if (d.date === today) card.classList.add("today");
-    else if (d.date < today) card.classList.add("past");
-    const head = el("div", "dayhead");
-    head.append(el("span", "wd", d.weekday.slice(0, 3)));
-    head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
-    card.append(head);
+    const card = dayCard(d, today);
     let any = false;
     for (const m of d.meals) {
-      const seen = new Set();
-      const hits = [];
+      const seen = new Set(), hits = [];
       for (const c of m.categories) {
         if (SKIP.has(c.name.toLowerCase())) continue;
         for (const it of c.items) if (matches(it.name) && !seen.has(it.name)) { seen.add(it.name); hits.push(it); }
@@ -110,27 +103,18 @@
 
   function renderDay(d, today) {
     if (state.q) return renderSearchDay(d, today);
-    const card = el("article", "day");
-    if (d.date === today) card.classList.add("today");
-    else if (d.date < today) card.classList.add("past");
-    const head = el("div", "dayhead");
-    head.append(el("span", "wd", d.weekday.slice(0, 3)));
-    head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
-    card.append(head);
-
+    const card = dayCard(d, today);
     const meal = d.meals.find((m) => m.name === state.meal);
     if (!meal) { card.append(el("p", "none", d.meals.length ? "Not served" : "No menu posted")); return card; }
 
-    // bucket items into groups, dropping staples unless "show everything";
-    // favorites always surface at the top, wherever they were listed
+    // bucket items into groups, dropping staples unless "show everything"
     const buckets = new Map(GROUPS.map(([g]) => [g, []]));
-    const favs = [], staples = [], seen = new Set();
+    const staples = [], seen = new Set();
     for (const c of meal.categories) {
       if (SKIP.has(c.name.toLowerCase())) continue;
       for (const it of c.items) {
         if (seen.has(it.name)) continue;
         seen.add(it.name);
-        if (state.favs.has(it.name)) { favs.push(it); continue; }
         if (c.staple || it.staple) { staples.push(it); continue; }
         buckets.get(groupOf(c.name)).push(it);
       }
@@ -141,19 +125,11 @@
     const extraCount = hidden.reduce((n, [, v]) => n + v.length, 0);
 
     let any = false;
-    if (favs.length) {
-      const sec = el("div", "grp favs");
-      const ul = el("ul");
-      favs.forEach((it) => ul.append(itemLi({ ...it, staple: false })));
-      sec.append(ul);
-      card.append(sec);
-      any = true;
-    }
     for (const [g, items] of buckets) {
       if (!items.length) continue;
       if (!DEFAULT_OPEN.has(g) && !open) continue;
       const sec = el("div", "grp");
-      if (g !== "Mains" || favs.length) sec.append(el("h4", null, g));
+      if (g !== "Mains") sec.append(el("h4", null, g));
       const ul = el("ul");
       items.forEach((it) => ul.append(itemLi(it)));
       sec.append(ul);
@@ -186,12 +162,15 @@
     return n;
   };
 
+  const goWeek = (i) => { if (i >= 0 && i < state.data.weeks.length) { state.week = i; state.day = 0; render(); } };
+
   function render() {
     const w = state.data.weeks[state.week];
     const today = todayISO();
+    const first = state.week === 0, last = state.week === state.data.weeks.length - 1;
     range.textContent = `${fmt(w.start, { month: "short", day: "numeric" })} – ${fmt(w.end, { month: "short", day: "numeric" })}`;
-    prev.disabled = state.week === 0;
-    next.disabled = state.week === state.data.weeks.length - 1;
+    prev.disabled = first;
+    next.disabled = last;
     document.body.classList.toggle("searching", !!state.q);
     for (const chip of document.querySelectorAll(".chip")) chip.classList.toggle("on", !state.q && chip.dataset.meal === state.meal);
 
@@ -203,37 +182,36 @@
     grid.replaceChildren(...cards);
 
     if (state.q) {
-      const others = state.data.weeks
-        .map((ow, i) => [i, ow])
-        .filter(([i]) => i !== state.week)
-        .map(([i, ow]) => [i, countHits(ow)])
-        .filter(([, n]) => n);
       if (!cards.length) grid.append(el("p", "empty", "No matches this week"));
-      for (const [i, n] of others) {
+      state.data.weeks.forEach((ow, i) => {
+        if (i === state.week) return;
+        const n = countHits(ow);
+        if (!n) return;
         const p = el("p", "hint");
         const b = el("button", null, `${n} ${n === 1 ? "match" : "matches"} ${i > state.week ? "next" : "last"} week →`);
-        b.onclick = () => { state.week = i; state.day = 0; render(); };
+        b.onclick = () => goWeek(i);
         p.append(b);
         grid.append(p);
-      }
+      });
     }
 
-    tabs.replaceChildren(...w.days.map((d, i) => {
+    // phone day strip, with the week arrows at either end
+    const pa = el("button", "icon", "‹"); pa.disabled = first; pa.setAttribute("aria-label", "Previous week"); pa.onclick = () => goWeek(state.week - 1);
+    const na = el("button", "icon", "›"); na.disabled = last; na.setAttribute("aria-label", "Next week"); na.onclick = () => goWeek(state.week + 1);
+    tabs.replaceChildren(pa, ...w.days.map((d, i) => {
       const b = el("button", "daytab" + (i === state.day ? " on" : "") + (d.date === today ? " today" : ""));
       b.setAttribute("role", "tab");
       b.append(el("span", null, d.weekday.slice(0, 3)), el("b", null, String(parse(d.date).getDate())));
       b.onclick = () => { state.day = i; render(); };
       return b;
-    }));
-    const on = tabs.querySelector(".on");
-    if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
+    }), na);
   }
 
-  prev.onclick = () => { if (state.week > 0) { state.week--; state.day = 0; render(); } };
-  next.onclick = () => { if (state.week < state.data.weeks.length - 1) { state.week++; state.day = 0; render(); } };
+  prev.onclick = () => goWeek(state.week - 1);
+  next.onclick = () => goWeek(state.week + 1);
   allBox.onchange = () => {
     document.body.classList.toggle("showall", allBox.checked);
-    save("berg.all", allBox.checked);
+    try { localStorage.setItem("berg.all", allBox.checked ? "1" : "0"); } catch (_) {}
     render();
   };
   for (const chip of document.querySelectorAll(".chip")) {
