@@ -8,7 +8,7 @@ WORK="$(mktemp -d)"
 gh repo clone michaellhan/michaellhan.github.io "$WORK/site" -- -q --depth 1
 rm -rf "$WORK/site/berg"
 mkdir -p "$WORK/site/berg/data"
-cp "$HERE/index.html" "$HERE/style.css" "$HERE/app.js" "$WORK/site/berg/"
+cp "$HERE"/index.html "$HERE"/style.css "$HERE"/app.js "$HERE"/manifest.webmanifest "$HERE"/icon.svg "$HERE"/icon-*.png "$HERE"/apple-touch-icon.png "$WORK/site/berg/"
 cp "$HERE/data/menu.json" "$WORK/site/berg/data/"
 cd "$WORK/site"
 git add -A berg

@@ -5,7 +5,11 @@ menu. Staples that appear every day (salad bar, grill, deli, yogurt bar, etc.)
 are hidden unless you tick **Show everything**.
 
 - `scrape.py` pulls this week and next from the HUDS FoodPro site into `data/menu.json` (stdlib only).
-- `index.html`, `style.css`, `app.js` render it. No build step.
+- `index.html`, `style.css`, `app.js` render it. No build step. Search covers every
+  meal (staples included) across both weeks; starred favorites are kept in the
+  browser and surface at the top of any day they appear.
+- `manifest.webmanifest` and the icons make it installable from a phone's
+  "Add to Home Screen".
 - `.github/workflows/update.yml` re-scrapes every morning at 5 AM Eastern and publishes to GitHub Pages.
 
 ## Run locally

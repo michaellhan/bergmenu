@@ -13,11 +13,16 @@
   <meta property="og:url" content="https://michael-han.com/berg/">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf9">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#131211">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23a51c30'/></svg>">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Berg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="top">
@@ -36,6 +41,7 @@
         <button class="chip" data-meal="Lunch">Lunch</button>
         <button class="chip" data-meal="Dinner">Dinner</button>
       </div>
+      <input type="search" id="q" class="search" placeholder="Search" aria-label="Search the menu" autocomplete="off">
       <label class="toggle">
         <input type="checkbox" id="all">
         <span>Show everything</span>
@@ -59,6 +65,6 @@
     <a id="source" href="https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx?sName=HARVARD+UNIVERSITY+DINING+SERVICES&locationNum=30&locationName=Annenberg&naFlag=1&WeeksMenus=This+Week%27s+Menus&myaction=read" target="_blank" rel="noopener">Full menu on HUDS ↗</a>
   </footer>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

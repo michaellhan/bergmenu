@@ -1,0 +1,15 @@
+{
+  "name": "Annenberg Menu",
+  "short_name": "Berg",
+  "description": "What's new on the Annenberg dining hall menu each day.",
+  "start_url": "/berg/",
+  "scope": "/berg/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#a51c30",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

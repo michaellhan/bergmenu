@@ -43,7 +43,7 @@ jobs:
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
           git clone -q --depth 1 git@github.com:michaellhan/michaellhan.github.io.git site
           rm -rf site/berg && mkdir -p site/berg/data
-          cp index.html style.css app.js site/berg/
+          cp index.html style.css app.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png site/berg/
           cp data/menu.json site/berg/data/
           cd site
           git config user.name "menu-bot"

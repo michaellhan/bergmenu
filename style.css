@@ -82,6 +82,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .chip:hover:not(.on) { color: var(--ink); }
+.search {
+  font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 12px; width: 120px; outline: none;
+  transition: width 0.15s;
+}
+.search:focus, .search:not(:placeholder-shown) { width: 180px; border-color: var(--muted); }
+.search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); cursor: pointer; user-select: none; }
 .toggle input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 
@@ -151,6 +159,19 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .grp ul { list-style: none; margin: 0; padding: 0; }
 .grp li { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
 .grp li span { min-width: 0; overflow-wrap: anywhere; }
+.grp li .star {
+  margin-left: auto; padding: 0 2px; flex: 0 0 auto;
+  font-size: 13px; line-height: 1; color: var(--faint); opacity: 0;
+  transform: translateY(1px);
+}
+.grp li:hover .star, .grp li.fav .star { opacity: 1; }
+.grp li.fav .star { color: var(--accent); }
+.grp li.fav > span:first-child { color: var(--accent); font-weight: 500; }
+@media (hover: none) { .grp li .star { opacity: 0.5; } }
+.grp li .tags + .star { margin-left: auto; }
+.searching .day { display: block; }
+.hint { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
+.hint button { color: var(--accent); padding: 0; }
 .grp.staples li { color: var(--muted); }
 .more {
   display: block; margin: 8px 0 2px; padding: 0;
@@ -188,6 +209,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .grid { grid-template-columns: 1fr; }
   .day { display: none; }
   .day.active { display: block; }
+  .searching .daytabs { display: none; }
+  .search { width: 100px; }
+  .search:focus, .search:not(:placeholder-shown) { width: 140px; }
   .day.past { opacity: 1; }
   .dayhead .wd { font-size: 17px; }
 }
