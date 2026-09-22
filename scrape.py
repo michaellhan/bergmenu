@@ -195,7 +195,7 @@ def main() -> int:
         "weeks": weeks,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
+    OUT.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False) + "\n")
     n_items = sum(len(c["items"]) for w in weeks for d in w["days"] for m in d["meals"] for c in m["categories"])
     print(f"wrote {OUT} ({len(weeks)} weeks, {n_items} items)")
     return 0

@@ -35,7 +35,7 @@
 
   function pickDefaults() {
     const { iso: t, hour } = nowParts();
-    state.meal = hour < 10 ? "Breakfast" : hour < 15 ? "Lunch" : hour < 21 ? "Dinner" : "Brain Break";
+    state.meal = hour < 10 ? "Breakfast" : hour < 15 ? "Lunch" : "Dinner";
     const i = state.data.weeks.findIndex((w) => t >= w.start && t <= w.end);
     state.week = i >= 0 ? i : (t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1);
     const days = state.data.weeks[state.week].days;
@@ -70,16 +70,6 @@
     head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
     card.append(head);
 
-    // Brain Break is a late-night station listed under Dinner; give it its own view.
-    if (state.meal === "Brain Break") {
-      const dinner = d.meals.find((m) => m.name === "Dinner");
-      const bb = dinner && dinner.categories.find((c) => c.name.toLowerCase() === "brain break");
-      if (!bb || !bb.items.length) { card.append(el("p", "none", "No brain break")); return card; }
-      const ul = el("ul");
-      bb.items.forEach((it) => ul.append(itemLi({ ...it, staple: false })));
-      const sec = el("div", "grp"); sec.append(ul); card.append(sec);
-      return card;
-    }
     const meal = d.meals.find((m) => m.name === state.meal);
     if (!meal) { card.append(el("p", "none", d.meals.length ? "Not served" : "No menu posted")); return card; }
 
@@ -87,6 +77,7 @@
     const buckets = new Map(GROUPS.map(([g]) => [g, []]));
     const staples = [];
     for (const c of meal.categories) {
+      // HUDS lists a fixed weekly Brain Break template, not the real nightly spread; skip it.
       if (c.name.toLowerCase() === "brain break") continue;
       for (const it of c.items) {
         if (c.staple || it.staple) { staples.push(it); continue; }
@@ -170,7 +161,12 @@
       pickDefaults();
       render();
       const t = new Date(data.generated);
+      const ageDays = (Date.now() - t.getTime()) / 864e5;
       $("#updated").textContent = "Updated " + t.toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      if (ageDays > 2) {
+        const warn = el("p", "stale", "This menu hasn't refreshed in " + Math.floor(ageDays) + " days and may be out of date.");
+        grid.before(warn);
+      }
       if (data.source) $("#source").href = data.source;
     })
     .catch((e) => { grid.replaceChildren(el("p", "empty", "Couldn't load the menu (" + e.message + ")")); });
