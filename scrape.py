@@ -36,9 +36,10 @@ STAPLE_CATEGORIES = {
     "brown rice station", "fresh fruit", "bagel", "build your own",
     "featured special bar", "bread choices",
 }
-# An item is also a staple if it shows up in the same meal on at least this
-# many days of a week (when the week has enough data to judge).
-STAPLE_MIN_DAYS = 6
+# An item is also a staple if it shows up in the same meal on every day that
+# meal is served, or all but this many (when the week has enough data to judge).
+# Sunday brunch replaces breakfast and lunch, so those run 6 days, dinner 7.
+STAPLE_MISSING_DAYS = 1
 MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break"]
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
 
@@ -177,7 +178,7 @@ def flag_staples(days: list[dict]) -> None:
     staple_names = set()
     for (meal_name, item_name), c in counts.items():
         n = meal_days[meal_name]
-        if n >= 5 and c >= min(STAPLE_MIN_DAYS, n):
+        if n >= 5 and c >= n - STAPLE_MISSING_DAYS:
             staple_names.add(item_name)
     for d in days:
         for meal in d["meals"]:

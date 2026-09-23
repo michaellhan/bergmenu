@@ -36,7 +36,8 @@ scripts/deploy.sh
 An item is hidden by default if either:
 
 - its station is in `STAPLE_CATEGORIES` in `scrape.py` (always-there stations), or
-- it appears in the same meal on at least 6 of the 7 days that week.
+- it appears in the same meal on every day that meal is served that week, or all but one
+  (breakfast and lunch run 6 days since Sunday is brunch; dinner runs 7).
 
 Tweak the list or the threshold in `scrape.py` if something is being hidden that shouldn't be.
 
