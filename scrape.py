@@ -40,6 +40,7 @@ STAPLE_CATEGORIES = {
 # many days of a week (when the week has enough data to judge).
 STAPLE_MIN_DAYS = 6
 MEAL_ORDER = ["Breakfast", "Lunch", "Dinner"]
+NAME_LIMIT = 60  # FoodPro's recipe-name field width
 
 
 def menu_url(d: dt.date) -> str:
@@ -92,6 +93,9 @@ def parse_day(page: str) -> list[dict]:
             if re.search(r"\(\s*H\s*\)\s*$", name):
                 name = re.sub(r"\s*\(\s*H\s*\)\s*$", "", name)
                 tags.append("halal")
+            # FoodPro silently cuts recipe names at 60 chars; mark the cut.
+            if len(name) >= NAME_LIMIT:
+                name = name.rstrip(" &,/-") + "…"
             if cur is None:
                 cur = "Other"
                 cats.setdefault(cur, [])
