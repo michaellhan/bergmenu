@@ -40,6 +40,14 @@ An item is hidden by default if either:
 
 Tweak the list or the threshold in `scrape.py` if something is being hidden that shouldn't be.
 
+## What shows by default
+
+Grouping is by HUDS station. Entrées, soup and dessert always show. Vegetables,
+starches, plant protein, smoothies and the pasta bar (shown as one dish) sit behind
+"+ N more", which counts dishes only. Condiments, dessert toppings and breads (the
+"Sides" station, sundae toppings, cornbread at the chili bar) are listed on one
+"With …" line when it's opened. The rules live in `GROUPS`/`groupOf` in `app.js`.
+
 ## Brunch and Brain Break
 
 FoodPro only has Breakfast, Lunch and Dinner. The scraper reshapes two things:

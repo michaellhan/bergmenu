@@ -5,24 +5,27 @@
   const prev = $("#prev"), next = $("#next"), allBox = $("#all"), q = $("#q");
   const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
 
-  // Collapse HUDS's many stations into a few groups. Mains (unlabelled, at the
-  // top), soup and dessert show by default; sides and extras sit behind "more".
+  // Collapse HUDS's many stations into a few groups, by station. Mains
+  // (unlabelled, at the top), soup and dessert always show; sides sit behind
+  // "more". Condiments, toppings and breads aren't dishes: they never count
+  // toward "more" and show as a single "With" line once it's opened.
   const GROUPS = [
     ["Mains", ["entrees", "veg,vegan", "halal", "brunch", "chili bar/stew",
                "breakfast entrees", "breakfast meats", "breakfast bakery"]],
     ["Soup", ["today's soup"]],
     ["Dessert", ["desserts", "miscellaneous"]],
-    ["Sides", ["plant protein", "starch and potatoes", "vegetables", "sides",
-               "whole grain pasta bar", "bread choices"]],
-    ["Extras", ["delish"]],
+    ["Sides", ["plant protein", "starch and potatoes", "vegetables", "delish"]],
   ];
   const DEFAULT_OPEN = new Set(["Mains", "Soup", "Dessert"]);
-  const BREAD = /cornbread|bread|roll|hawaiian|cracker|tortilla/i;
-  const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|cinnamon sugar|^banana$/i;
+  const PASTA = "whole grain pasta bar";
+  const BREAD = /cornbread|bread|roll|hawaiian|biscuit|cracker|tortilla/i;
+  const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|sugar|^banana$/i;
+  // null = an add-on (the "Sides" station is all sauces, garnishes and bread)
   const groupOf = (cat, name) => {
     const c = cat.toLowerCase();
-    if (c === "chili bar/stew" && BREAD.test(name)) return "Sides";
-    if (c === "desserts" && TOPPING.test(name)) return "Extras";
+    if (c === "sides" || c === "bread choices") return null;
+    if (c === "chili bar/stew" && BREAD.test(name)) return null;
+    if (c === "desserts" && TOPPING.test(name)) return null;
     for (const [g, names] of GROUPS) if (names.includes(c)) return g;
     return "Sides";
   };
@@ -183,19 +186,24 @@
 
     // bucket items into groups, dropping staples unless "show everything"
     const buckets = new Map(GROUPS.map(([g]) => [g, []]));
-    const staples = [], seen = new Set();
+    const staples = [], addons = [], pasta = [], seen = new Set();
     for (const c of meal.categories) {
       for (const it of c.items) {
         if (seen.has(it.name)) continue;
         seen.add(it.name);
         if (c.staple || it.staple) { staples.push(it); continue; }
-        buckets.get(groupOf(c.name, it.name)).push(it);
+        // the pasta bar's shape and sauce make one dish
+        if (c.name.toLowerCase() === PASTA) { pasta.push(it.name); continue; }
+        const g = groupOf(c.name, it.name);
+        (g ? buckets.get(g) : addons).push(it);
       }
     }
+    if (pasta.length) buckets.get("Sides").push({ name: "Pasta bar: " + pasta.join(", "), tags: [] });
     const key = d.date + "|" + meal.name;
     const open = state.open.has(key);
     const hidden = [...buckets].filter(([g, v]) => !DEFAULT_OPEN.has(g) && v.length);
-    const extraCount = hidden.reduce((n, [, v]) => n + v.length, 0);
+    const dishCount = hidden.reduce((n, [, v]) => n + v.length, 0);
+    const extraCount = dishCount + addons.length;
 
     let any = false;
     for (const [g, items] of buckets) {
@@ -209,9 +217,12 @@
       card.append(sec);
       any = true;
     }
+    if (open && addons.length) {
+      card.append(el("p", "with", "With " + addons.map((it) => it.name).join(", ")));
+    }
     if (!any && !extraCount) card.append(el("p", "none", "Nothing new"));
     if (extraCount) {
-      const b = el("button", "more", open ? "Less" : `+ ${extraCount} more`);
+      const b = el("button", "more", open ? "Less" : dishCount ? `+ ${dishCount} more` : "+ extras");
       b.onclick = () => { open ? state.open.delete(key) : state.open.add(key); render(); };
       card.append(b);
     }
