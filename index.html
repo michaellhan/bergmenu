@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header class="top">
@@ -30,6 +30,18 @@
       <h1>Annenberg</h1>
       <p class="sub">What's new each day</p>
     </div>
+    <details class="status" id="status">
+      <summary><span class="dot"></span><span id="statusText">&nbsp;</span></summary>
+      <div class="hours">
+        <table>
+          <tr><th>Breakfast</th><td>7:30 – 10:30 AM</td></tr>
+          <tr><th>Lunch</th><td>11:30 AM – 2 PM</td></tr>
+          <tr><th>Dinner</th><td>4:30 – 7:30 PM</td></tr>
+          <tr><th>Brain Break</th><td>9 – 11 PM <small>Sun–Thu</small></td></tr>
+        </table>
+        <p>Sunday lunch is brunch and breakfast is continental. Holidays and breaks differ.</p>
+      </div>
+    </details>
     <nav class="controls" aria-label="View controls">
       <div class="weeknav">
         <button id="prev" class="icon" aria-label="Previous week">&#8249;</button>
@@ -62,6 +74,6 @@
     <a id="source" href="https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx?sName=HARVARD+UNIVERSITY+DINING+SERVICES&locationNum=30&locationName=Annenberg&naFlag=1&WeeksMenus=This+Week%27s+Menus&myaction=read" target="_blank" rel="noopener">Full menu on HUDS ↗</a>
   </footer>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

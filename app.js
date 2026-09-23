@@ -43,14 +43,54 @@
 
   const addDays = (iso, n) => { const d = parse(iso); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
 
-  // Open on the next meal still to come: breakfast ends 10:30, lunch 2:30,
-  // dinner 7:30. After dinner, jump ahead to tomorrow's breakfast.
+  // Annenberg hours in minutes after midnight, Eastern. Sunday lunch is
+  // brunch; Brain Break runs Sunday through Thursday nights.
+  const hm = (h, m = 0) => h * 60 + m;
+  const HOURS = [
+    ["Breakfast", hm(7, 30), hm(10, 30)],
+    ["Lunch", hm(11, 30), hm(14)],
+    ["Dinner", hm(16, 30), hm(19, 30)],
+  ];
+  const slotsFor = (iso) => {
+    const wd = parse(iso).getDay();
+    const s = HOURS.map(([n, a, b]) => [wd === 0 && n === "Lunch" ? "Brunch" : n, a, b]);
+    if (wd <= 4) s.push(["Brain Break", hm(21), hm(23)]);
+    return s;
+  };
+  const clock = (m) => {
+    const h = Math.floor(m / 60) % 24, mm = m % 60;
+    return `${h % 12 || 12}${mm ? ":" + String(mm).padStart(2, "0") : ""} ${h < 12 ? "AM" : "PM"}`;
+  };
+
+  function updateStatus() {
+    const { iso, mins } = nowParts();
+    const box = $("#status"), text = $("#statusText");
+    const cur = slotsFor(iso).find(([, a, b]) => mins >= a && mins < b);
+    let msg, open = !!cur;
+    if (cur) {
+      const left = cur[2] - mins;
+      msg = `Open · ${cur[0]} ${left <= 30 ? `ends in ${left} min` : `until ${clock(cur[2])}`}`;
+    } else {
+      const next = slotsFor(iso).find(([, a]) => a > mins);
+      if (next) {
+        const wait = next[1] - mins;
+        msg = `Closed · ${next[0]} ${wait <= 60 ? `in ${wait} min` : `at ${clock(next[1])}`}`;
+      } else {
+        const [n, a] = slotsFor(addDays(iso, 1))[0];
+        msg = `Closed · ${n} tomorrow at ${clock(a)}`;
+      }
+    }
+    text.textContent = msg;
+    box.classList.toggle("open", open);
+  }
+
+  // Open on the next meal still to come; after dinner, jump ahead to
+  // tomorrow's breakfast.
   function pickDefaults() {
     const { iso: t, mins } = nowParts();
     let target = t;
-    if (mins < 10 * 60 + 30) state.meal = "Breakfast";
-    else if (mins < 14 * 60 + 30) state.meal = "Lunch";
-    else if (mins < 19 * 60 + 30) state.meal = "Dinner";
+    const next = HOURS.find(([, , end]) => mins < end);
+    if (next) state.meal = next[0];
     else { state.meal = "Breakfast"; target = addDays(t, 1); }
     const locate = (iso) => {
       const wi = state.data.weeks.findIndex((w) => iso >= w.start && iso <= w.end);
@@ -363,6 +403,11 @@
   let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };
+
+  updateStatus();
+  setInterval(updateStatus, 30e3);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) updateStatus(); });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#status")) $("#status").open = false; });
 
   fetch("data/menu.json", { cache: "no-cache" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })

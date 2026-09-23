@@ -45,11 +45,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* header */
 .top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px 24px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: 6px 24px;
   padding: 28px 0 18px;
 }
 .brand h1 {
@@ -85,6 +84,30 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); cursor: pointer; user-select: none; }
 .toggle input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+
+/* open/closed status + hours popover */
+.status { position: relative; justify-self: center; margin-bottom: 7px; font-size: 12.5px; color: var(--muted); }
+.status summary {
+  display: inline-flex; align-items: center; gap: 7px;
+  list-style: none; cursor: pointer; user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.status summary::-webkit-details-marker { display: none; }
+.status summary:hover { color: var(--ink); }
+.status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.status.open .dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.16); }
+.status.open summary { color: var(--ink); }
+.hours {
+  position: absolute; z-index: 10; top: calc(100% + 8px); left: 0;
+  width: 250px; padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.hours table { border-collapse: collapse; width: 100%; }
+.hours th { text-align: left; font-weight: 500; color: var(--ink); padding: 3px 0; }
+.hours td { text-align: right; padding: 3px 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hours small { color: var(--faint); font-size: 11px; }
+.hours p { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11.5px; line-height: 1.4; }
 
 /* mobile day tabs */
 .daytabs {
@@ -175,19 +198,28 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 @media (max-width: 1180px) {
   .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+@media (max-width: 1080px) {
+  /* not enough room between title and controls: status goes back under the title */
+  .status { grid-column: 1; grid-row: 2; justify-self: start; margin: 0; }
+  .controls { grid-column: 3; grid-row: 1 / span 2; }
+}
 @media (max-width: 860px) {
   body { font-size: 15px; padding-bottom: 32px; }
 
   /* header: title + search on one line, then a segmented meal control */
-  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0 10px; }
+  .top {
+    display: grid; grid-template-columns: 1fr auto; align-items: center;
+    gap: 2px 12px; padding: 20px 0 10px;
+  }
   .brand h1 { font-size: 22px; }
   .brand .sub { display: none; }
-  .controls { display: contents; }
+  .status { grid-column: 1; grid-row: auto; font-size: 13px; }
+  .controls { display: contents; grid-row: auto; }
   .weeknav { display: none; }
-  .search { order: 1; margin-left: auto; width: 96px; }
+  .search { grid-column: 2; grid-row: 1 / span 2; justify-self: end; width: 96px; }
   .search:focus, .search:not(:placeholder-shown) { width: 150px; }
   .chips {
-    order: 2; flex: 0 0 100%;
+    grid-column: 1 / -1; margin-top: 10px;
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
     padding: 3px; border-radius: 10px; background: var(--line);
   }
