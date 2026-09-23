@@ -208,8 +208,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .searching .daytabs { display: none; }
 
   /* content: a flat list, no card; swipe left/right to change day */
-  .grid { display: block; min-height: 40vh; }
+  /* the stage spans the full screen width and clips the day sliding past it */
+  .stage { margin: 0 -16px; padding: 0 16px; overflow: hidden; overflow: clip visible; }
+  .grid { display: block; position: relative; min-height: 40vh; }
   body { touch-action: pan-y pinch-zoom; }
+  .day.peek { position: absolute; left: 0; top: 0; width: 100%; background: var(--bg); pointer-events: none; }
   .day { display: none; border: 0; background: none; padding: 4px 0 0; box-shadow: none; opacity: 1; }
   .day.active { display: block; }
   .day.today { box-shadow: none; }

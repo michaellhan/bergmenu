@@ -178,14 +178,15 @@
     return n;
   };
 
-  const goWeek = (i) => { if (i >= 0 && i < state.data.weeks.length) { state.week = i; state.day = 0; render(); } };
-  // step one day, crossing into the next or previous week at the ends
-  const goDay = (delta) => {
+  const goWeek = (i) => { if (i >= 0 && i < state.data.weeks.length) goTo(i, 0); };
+  // the day `delta` steps away, crossing into the next or previous week at the ends
+  const step = (delta) => {
     const n = state.data.weeks[state.week].days.length;
     const d = state.day + delta;
-    if (d >= 0 && d < n) { state.day = d; render(); }
-    else if (d >= n && state.week < state.data.weeks.length - 1) { state.week++; state.day = 0; render(); }
-    else if (d < 0 && state.week > 0) { state.week--; state.day = state.data.weeks[state.week].days.length - 1; render(); }
+    if (d >= 0 && d < n) return { week: state.week, day: d };
+    if (d >= n && state.week < state.data.weeks.length - 1) return { week: state.week + 1, day: 0 };
+    if (d < 0 && state.week > 0) return { week: state.week - 1, day: state.data.weeks[state.week - 1].days.length - 1 };
+    return null;
   };
 
   function render() {
@@ -226,7 +227,7 @@
       const b = el("button", "daytab" + (i === state.day ? " on" : "") + (d.date === today ? " today" : ""));
       b.setAttribute("role", "tab");
       b.append(el("span", null, d.weekday.slice(0, 3)), el("b", null, String(parse(d.date).getDate())));
-      b.onclick = () => { state.day = i; render(); };
+      b.onclick = () => goTo(state.week, i);
       return b;
     }), na);
   }
@@ -241,22 +242,124 @@
   for (const chip of document.querySelectorAll(".chip")) {
     chip.onclick = () => { state.meal = chip.dataset.meal; state.q = ""; q.value = ""; render(); };
   }
-  // swipe between days on phones: pointer events cover touch, pen and mouse
+  // Swipe between days on phones. The list follows the finger with the next or
+  // previous day peeking in from the side. Touch events rather than pointer
+  // events so we can cancel touchmove: iOS Safari ignores `pan-y pinch-zoom`,
+  // so without it a slightly diagonal swipe would also scroll the page.
   const phone = matchMedia("(max-width: 860px)");
-  let swipe = null;
-  document.addEventListener("pointerdown", (e) => {
-    swipe = null;
-    if (!phone.matches || state.q || !state.data) return;
-    if (e.target.closest("input, button, .top, .daytabs")) return;
-    swipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const GAP = 16;
+  let sw = null, settling = false, swipedAt = 0;
+
+  const setX = (x, ms) => {
+    grid.style.transition = ms ? `transform ${ms}ms cubic-bezier(0.2, 0.8, 0.3, 1)` : "";
+    grid.style.transform = x ? `translate3d(${x}px, 0, 0)` : "";
+  };
+  // animate the list to x, then run fn and drop the transform in the same frame
+  const settle = (x, fn) => {
+    const ms = reduced.matches ? 0 : 240;
+    settling = true;
+    let done = false;
+    const end = () => {
+      if (done) return;
+      done = true;
+      grid.removeEventListener("transitionend", end);
+      fn();
+      setX(0);
+      settling = false;
+    };
+    if (!ms) return end();
+    grid.addEventListener("transitionend", end);
+    setTimeout(end, ms + 80);
+    setX(x, ms);
+  };
+  // render the neighbouring day beside the current one (dir 1 = next, -1 = previous)
+  const peekAt = (dir) => {
+    if (sw.dir === dir) return;
+    if (sw.peek) sw.peek.remove();
+    sw.dir = dir;
+    sw.peek = null;
+    sw.to = step(dir);
+    if (!sw.to) return;
+    const c = renderDay(state.data.weeks[sw.to.week].days[sw.to.day], todayISO());
+    c.classList.add("active", "peek");
+    c.style.left = `${dir * (sw.w + GAP)}px`;
+    c.style.top = `${sw.off}px`;
+    grid.append(c);
+    sw.peek = c;
+  };
+  const release = (cancelled) => {
+    const s = sw;
+    sw = null;
+    if (!s || s.axis !== "x") return;
+    swipedAt = Date.now();
+    const flick = Math.abs(s.vx) > 0.4 && Math.sign(s.vx) === -s.dir;
+    if (!cancelled && s.to && (Math.abs(s.dx) > s.w * 0.25 || flick)) {
+      settle(-s.dir * (s.w + GAP), () => {
+        state.week = s.to.week;
+        state.day = s.to.day;
+        render();
+        // keep the new day's top where the peek showed it
+        if (s.off) window.scrollBy(0, -s.off);
+      });
+    } else {
+      settle(0, () => { if (s.peek) s.peek.remove(); });
+    }
+  };
+
+  document.addEventListener("touchstart", (e) => {
+    if (sw) { release(true); return; } // a second finger: hand over to pinch zoom
+    if (settling || e.touches.length > 1 || !phone.matches || state.q || !state.data) return;
+    if (e.target.closest("input, .top, .daytabs")) return;
+    const t = e.touches[0];
+    sw = {
+      x: t.clientX, y: t.clientY, lx: t.clientX, lt: e.timeStamp, vx: 0, dx: 0,
+      axis: null, dir: 0, to: null, peek: null,
+      w: grid.clientWidth, off: Math.max(0, -grid.getBoundingClientRect().top),
+    };
   }, { passive: true });
-  document.addEventListener("pointerup", (e) => {
-    if (!swipe || e.pointerId !== swipe.id) return;
-    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
-    swipe = null;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) goDay(dx < 0 ? 1 : -1);
-  }, { passive: true });
-  document.addEventListener("pointercancel", () => { swipe = null; }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!sw) return;
+    const t = e.touches[0];
+    const dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if (!sw.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      // Mostly vertical, or the browser has already started scrolling
+      // (touchmove no longer cancelable): let the page scroll, drop the swipe.
+      if (Math.abs(dx) <= Math.abs(dy) || !e.cancelable) { sw = null; return; }
+      sw.axis = "x";
+    }
+    if (e.cancelable) e.preventDefault(); // no vertical scroll mid-swipe
+    peekAt(dx < 0 ? 1 : -1);
+    const dt = e.timeStamp - sw.lt;
+    if (dt > 0) sw.vx = 0.7 * ((t.clientX - sw.lx) / dt) + 0.3 * sw.vx;
+    sw.lx = t.clientX;
+    sw.lt = e.timeStamp;
+    sw.dx = dx;
+    // at the first or last day, resist instead of following
+    setX(sw.to ? Math.max(-(sw.w + GAP), Math.min(sw.w + GAP, dx)) : dx / 4);
+  }, { passive: false });
+
+  document.addEventListener("touchend", (e) => { if (!e.touches.length) release(false); }, { passive: true });
+  document.addEventListener("touchcancel", () => release(true), { passive: true });
+  // don't let a swipe that ended on "+ more" also toggle it
+  document.addEventListener("click", (e) => {
+    if (Date.now() - swipedAt < 400) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
+
+  // tapping a day or week arrow slides the new day in from that side
+  const goTo = (week, day) => {
+    const dir = week !== state.week ? Math.sign(week - state.week) : Math.sign(day - state.day);
+    state.week = week;
+    state.day = day;
+    render();
+    if (dir && phone.matches && !reduced.matches && !state.q && grid.animate) {
+      grid.animate([{ transform: `translateX(${dir * 28}px)`, opacity: 0 }, { transform: "none", opacity: 1 }],
+        { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
+    }
+  };
+
   let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };
