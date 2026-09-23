@@ -39,7 +39,7 @@ STAPLE_CATEGORIES = {
 # An item is also a staple if it shows up in the same meal on at least this
 # many days of a week (when the week has enough data to judge).
 STAPLE_MIN_DAYS = 6
-MEAL_ORDER = ["Breakfast", "Lunch", "Dinner"]
+MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break"]
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
 
 
@@ -131,6 +131,34 @@ def mark_halal_dupes(meals: list[dict]) -> None:
             meal["categories"].remove(halal)
 
 
+def split_brain_break(meals: list[dict]) -> None:
+    """FoodPro lists the late-night Brain Break as a station inside dinner;
+    give it its own meal."""
+    items = []
+    for meal in meals:
+        for c in [c for c in meal["categories"] if c["name"].lower() == "brain break"]:
+            meal["categories"].remove(c)
+            items += [it for it in c["items"] if it["name"] not in {x["name"] for x in items}]
+    if items:
+        meals.append({"name": "Brain Break", "categories": [{"name": "Brain Break", "items": items}]})
+
+
+def merge_brunch(meals: list[dict]) -> list[dict]:
+    """Sunday's continental breakfast and lunch are one brunch menu: fold them
+    together, the Brunch station first."""
+    by = {m["name"]: m for m in meals}
+    if "Breakfast" not in by or "Lunch" not in by:
+        return meals
+    cats: "collections.OrderedDict[str, list]" = collections.OrderedDict()
+    for c in by["Lunch"]["categories"] + by["Breakfast"]["categories"]:
+        have = cats.setdefault(c["name"], [])
+        have += [it for it in c["items"] if it["name"] not in {x["name"] for x in have}]
+    order = sorted(cats, key=lambda n: n.lower() != "brunch")
+    brunch = {"name": "Brunch", "categories": [{"name": n, "items": cats[n]} for n in order]}
+    rest = [m for m in meals if m["name"] not in ("Breakfast", "Lunch")]
+    return sorted([brunch] + rest, key=lambda m: MEAL_ORDER.index(m["name"]) if m["name"] in MEAL_ORDER else 99)
+
+
 def flag_staples(days: list[dict]) -> None:
     """Flag items that are the same every day so the site can hide them."""
     counts: dict[tuple[str, str], int] = collections.Counter()
@@ -161,7 +189,8 @@ def flag_staples(days: list[dict]) -> None:
             for c in meal["categories"]:
                 c["staple"] = c["name"].lower() in STAPLE_CATEGORIES
                 for it in c["items"]:
-                    it["staple"] = c["staple"] or it["name"] in staple_names
+                    # Brain Break is one small spread; never hide any of it.
+                    it["staple"] = meal["name"] != "Brain Break" and (c["staple"] or it["name"] in staple_names)
 
 
 def main() -> int:
@@ -178,6 +207,9 @@ def main() -> int:
         for d, page in zip(dates[w * 7:(w + 1) * 7], pages[w * 7:(w + 1) * 7]):
             meals = parse_day(page)
             mark_halal_dupes(meals)
+            split_brain_break(meals)
+            if d.weekday() == 6:
+                meals = merge_brunch(meals)
             days.append({
                 "date": d.isoformat(),
                 "weekday": d.strftime("%A"),

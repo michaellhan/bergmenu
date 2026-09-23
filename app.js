@@ -17,8 +17,6 @@
     ["Extras", ["delish"]],
   ];
   const DEFAULT_OPEN = new Set(["Mains", "Soup", "Dessert"]);
-  // HUDS lists a fixed weekly Brain Break template, not the real nightly spread; skip it.
-  const SKIP = new Set(["brain break"]);
   const BREAD = /cornbread|bread|roll|hawaiian|cracker|tortilla/i;
   const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|cinnamon sugar|^banana$/i;
   const groupOf = (cat, name) => {
@@ -84,13 +82,13 @@
     box.classList.toggle("open", open);
   }
 
-  // Open on the next meal still to come; after dinner, jump ahead to
-  // tomorrow's breakfast.
+  // Open on the next meal still to come (Brain Break included); after the
+  // last one, jump ahead to tomorrow's breakfast.
   function pickDefaults() {
     const { iso: t, mins } = nowParts();
     let target = t;
-    const next = HOURS.find(([, , end]) => mins < end);
-    if (next) state.meal = next[0];
+    const next = slotsFor(t).find(([, , end]) => mins < end);
+    if (next) state.meal = next[0] === "Brunch" ? "Lunch" : next[0];
     else { state.meal = "Breakfast"; target = addDays(t, 1); }
     const locate = (iso) => {
       const wi = state.data.weeks.findIndex((w) => iso >= w.start && iso <= w.end);
@@ -105,6 +103,10 @@
       state.day = 0;
     }
   }
+
+  // Sunday breakfast and lunch are one brunch menu; either chip shows it.
+  const mealFor = (d) => d.meals.find((m) => m.name === state.meal)
+    || (state.meal === "Breakfast" || state.meal === "Lunch" ? d.meals.find((m) => m.name === "Brunch") : undefined);
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -142,7 +144,6 @@
     for (const m of d.meals) {
       const seen = new Set(), hits = [];
       for (const c of m.categories) {
-        if (SKIP.has(c.name.toLowerCase())) continue;
         for (const it of c.items) if (matches(it.name) && !seen.has(it.name)) { seen.add(it.name); hits.push(it); }
       }
       if (!hits.length) continue;
@@ -160,14 +161,30 @@
   function renderDay(d, today) {
     if (state.q) return renderSearchDay(d, today);
     const card = dayCard(d, today);
-    const meal = d.meals.find((m) => m.name === state.meal);
-    if (!meal) { card.append(el("p", "none", d.meals.length ? "Not served" : "No menu posted")); return card; }
+    const meal = mealFor(d);
+    if (!meal) {
+      const none = !d.meals.length ? "No menu posted" : state.meal === "Brain Break" ? "No Brain Break tonight" : "Not served";
+      card.append(el("p", "none", none));
+      return card;
+    }
+    if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
+
+    // Brain Break is one small nightly spread: list all of it, plus the
+    // self-serve basics that are out every night.
+    if (meal.name === "Brain Break") {
+      card.append(el("p", "mealnote", "9 – 11 PM"));
+      const sec = el("div", "grp");
+      const ul = el("ul");
+      meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false })));
+      sec.append(ul);
+      card.append(sec, el("p", "basics", "Plus cereal, bagels and bread, fruit, and drinks"));
+      return card;
+    }
 
     // bucket items into groups, dropping staples unless "show everything"
     const buckets = new Map(GROUPS.map(([g]) => [g, []]));
     const staples = [], seen = new Set();
     for (const c of meal.categories) {
-      if (SKIP.has(c.name.toLowerCase())) continue;
       for (const it of c.items) {
         if (seen.has(it.name)) continue;
         seen.add(it.name);
@@ -212,7 +229,6 @@
   const countHits = (w) => {
     let n = 0;
     for (const d of w.days) for (const m of d.meals) for (const c of m.categories) {
-      if (SKIP.has(c.name.toLowerCase())) continue;
       for (const it of c.items) if (matches(it.name)) n++;
     }
     return n;

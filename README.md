@@ -39,3 +39,12 @@ An item is hidden by default if either:
 - it appears in the same meal on at least 6 of the 7 days that week.
 
 Tweak the list or the threshold in `scrape.py` if something is being hidden that shouldn't be.
+
+## Brunch and Brain Break
+
+FoodPro only has Breakfast, Lunch and Dinner. The scraper reshapes two things:
+
+- **Sunday brunch**: Sunday's continental breakfast and lunch are merged into one
+  `Brunch` meal, which the site shows under both the Breakfast and Lunch tabs.
+- **Brain Break** (Sun–Thu, 9–11 PM): FoodPro lists the nightly snack as a station
+  inside dinner; it's split out into its own `Brain Break` meal and tab.
