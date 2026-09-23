@@ -4,8 +4,9 @@
     {
       "name": "site",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/mhan/Desktop/bergmenu && exec python3 -m http.server 8123"],
-      "port": 8123
+      "runtimeArgs": ["-c", "cd /tmp && exec python3 -m http.server ${PORT:-8123} --directory /Users/mhan/Desktop/bergmenu"],
+      "port": 8123,
+      "autoPort": true
     }
   ]
 }
