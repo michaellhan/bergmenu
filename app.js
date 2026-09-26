@@ -377,7 +377,7 @@
   document.addEventListener("touchstart", (e) => {
     if (sw) { release(true); return; } // a second finger: hand over to pinch zoom
     if (settling || e.touches.length > 1 || !phone.matches || state.q || !state.data) return;
-    if (e.target.closest("input, .top, .daytabs")) return;
+    if (e.target.closest("input, .top, .daytabs, dialog")) return;
     const t = e.touches[0];
     sw = {
       x: t.clientX, y: t.clientY, lx: t.clientX, lt: e.timeStamp, vx: 0, dx: 0,
@@ -435,6 +435,33 @@
   setInterval(updateStatus, 30e3);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) updateStatus(); });
   document.addEventListener("click", (e) => { if (!e.target.closest("#status")) $("#status").open = false; });
+
+  // add-to-home-screen: a corner button, hidden once running as an installed app
+  const homeBtn = $("#homeBtn"), homeDlg = $("#homeDlg"), installBtn = $("#installBtn");
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (!standalone && homeDlg.showModal) {
+    homeBtn.hidden = false;
+    // show only this device's steps; desktops see both
+    const ua = navigator.userAgent;
+    const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
+      : /Android/.test(ua) ? "android" : null;
+    if (os) homeDlg.querySelectorAll("section").forEach((s) => { s.hidden = s.dataset.os !== os; });
+    homeBtn.onclick = () => homeDlg.showModal();
+    homeDlg.onclick = (e) => { // tap the backdrop to close
+      const r = homeDlg.getBoundingClientRect();
+      if (e.target === homeDlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) homeDlg.close();
+    };
+    // Chrome/Android can install directly
+    let deferred;
+    addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; installBtn.hidden = false; });
+    installBtn.onclick = async () => {
+      if (!deferred) return;
+      deferred.prompt();
+      await deferred.userChoice;
+      deferred = null; installBtn.hidden = true; homeDlg.close();
+    };
+    addEventListener("appinstalled", () => { homeBtn.hidden = true; homeDlg.close(); });
+  }
 
   fetch("data/menu.json", { cache: "no-cache" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })

@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <header class="top">
@@ -75,6 +75,32 @@
     <a id="source" href="https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx?sName=HARVARD+UNIVERSITY+DINING+SERVICES&locationNum=30&locationName=Annenberg&naFlag=1&WeeksMenus=This+Week%27s+Menus&myaction=read" target="_blank" rel="noopener">Full menu on HUDS ↗</a>
   </footer>
 
-  <script src="app.js?v=15"></script>
+  <button id="homeBtn" class="homebtn" aria-label="Add to Home Screen" title="Add to Home Screen" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 8.5v6M9 11.5h6"/></svg>
+  </button>
+  <dialog id="homeDlg" class="homedlg" aria-labelledby="homeTitle">
+    <h2 id="homeTitle">Add to Home Screen</h2>
+    <p class="lede">Open the menu like an app, full screen, with one tap.</p>
+    <button id="installBtn" class="install" hidden>Install</button>
+    <section data-os="ios">
+      <h3>iPhone &amp; iPad (Safari)</h3>
+      <ol>
+        <li>Tap the <b>Share</b> button <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg></span> (in newer Safari, tap <b>···</b> first).</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b>.</li>
+      </ol>
+    </section>
+    <section data-os="android">
+      <h3>Android (Chrome)</h3>
+      <ol>
+        <li>Tap the <b>⋮</b> menu in the top corner.</li>
+        <li>Tap <b>Add to Home screen</b> (or <b>Install app</b>).</li>
+        <li>Tap <b>Add</b> or <b>Install</b>.</li>
+      </ol>
+    </section>
+    <form method="dialog"><button class="done">Done</button></form>
+  </dialog>
+
+  <script src="app.js?v=16"></script>
 </body>
 </html>
