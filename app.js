@@ -44,30 +44,53 @@
 
   const addDays = (iso, n) => { const d = parse(iso); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
 
-  // Annenberg hours in minutes after midnight, Eastern. Sunday lunch is
+  // Annenberg hours in minutes after midnight, Eastern: the one place they're
+  // written down (the hours popover is built from this). Sunday lunch is
   // brunch; Brain Break runs Sunday through Thursday nights.
   const hm = (h, m = 0) => h * 60 + m;
   const HOURS = [
     ["Breakfast", hm(7, 30), hm(10, 30)],
     ["Lunch", hm(11, 30), hm(14)],
     ["Dinner", hm(16, 30), hm(19, 30)],
+    ["Brain Break", hm(21), hm(23), [0, 1, 2, 3, 4], "Sun–Thu"],
   ];
+  const MEALS = HOURS.map(([n]) => n);
+  const dayData = (iso) => {
+    for (const w of state.data ? state.data.weeks : []) for (const d of w.days) if (d.date === iso) return d;
+  };
+  // Holidays and breaks: a day inside the scraped range with no posted meal
+  // counts as closed for that meal. Outside the range, trust the schedule.
+  const served = (d, slot) => d.meals.some((m) => m.name === slot
+    || (m.name === "Brunch" && (slot === "Breakfast" || slot === "Lunch" || slot === "Brunch")));
   const slotsFor = (iso) => {
-    const wd = parse(iso).getDay();
-    const s = HOURS.map(([n, a, b]) => [wd === 0 && n === "Lunch" ? "Brunch" : n, a, b]);
-    if (wd <= 4) s.push(["Brain Break", hm(21), hm(23)]);
-    return s;
+    const wd = parse(iso).getDay(), d = dayData(iso);
+    return HOURS.filter(([, , , days]) => !days || days.includes(wd))
+      .map(([n, a, b]) => [wd === 0 && n === "Lunch" ? "Brunch" : n, a, b])
+      .filter(([n]) => !d || served(d, n));
   };
-  const clock = (m) => {
+  const clock = (m, ampm = true) => {
     const h = Math.floor(m / 60) % 24, mm = m % 60;
-    return `${h % 12 || 12}${mm ? ":" + String(mm).padStart(2, "0") : ""} ${h < 12 ? "AM" : "PM"}`;
+    return `${h % 12 || 12}${mm ? ":" + String(mm).padStart(2, "0") : ""}${ampm ? (h < 12 ? " AM" : " PM") : ""}`;
   };
+  // "7:30 – 10:30 AM", "11:30 AM – 2 PM"
+  const span = (a, b) => `${clock(a, (a < 720) !== (b < 720))} – ${clock(b)}`;
+
+  (() => {
+    const table = $("#hoursTable");
+    for (const [n, a, b, , note] of HOURS) {
+      const tr = el("tr");
+      const td = el("td", null, span(a, b));
+      if (note) td.append(" ", el("small", null, note));
+      tr.append(el("th", null, n), td);
+      table.append(tr);
+    }
+  })();
 
   function updateStatus() {
     const { iso, mins } = nowParts();
     const box = $("#status"), text = $("#statusText");
     const cur = slotsFor(iso).find(([, a, b]) => mins >= a && mins < b);
-    let msg, open = !!cur;
+    let msg;
     if (cur) {
       const left = cur[2] - mins;
       msg = `Open · ${cur[0]} ${left <= 30 ? `ends in ${left} min` : `until ${clock(cur[2])}`}`;
@@ -77,34 +100,54 @@
         const wait = next[1] - mins;
         msg = `Closed · ${next[0]} ${wait <= 60 ? `in ${wait} min` : `at ${clock(next[1])}`}`;
       } else {
-        const [n, a] = slotsFor(addDays(iso, 1))[0];
-        msg = `Closed · ${n} tomorrow at ${clock(a)}`;
+        // the next day that's open at all (skips holidays and breaks)
+        msg = "Closed";
+        for (let i = 1; i <= 21; i++) {
+          const s = slotsFor(addDays(iso, i))[0];
+          if (!s) continue;
+          const when = i === 1 ? "tomorrow" : i < 7 ? fmt(addDays(iso, i), { weekday: "short" }) : fmt(addDays(iso, i), { month: "short", day: "numeric" });
+          msg = `Closed · ${s[0]} ${when} at ${clock(s[1])}`;
+          break;
+        }
       }
     }
     text.textContent = msg;
-    box.classList.toggle("open", open);
+    box.classList.toggle("open", !!cur);
   }
 
-  // Open on the next meal still to come (Brain Break included); after the
-  // last one, jump ahead to tomorrow's breakfast.
-  function pickDefaults() {
+  // The view to open on: the next meal still to come (Brain Break included);
+  // after the last one, the first meal of the next day that's open.
+  function defaultView() {
     const { iso: t, mins } = nowParts();
-    let target = t;
+    const chip = (slot) => slot === "Brunch" ? "Lunch" : slot;
     const next = slotsFor(t).find(([, , end]) => mins < end);
-    if (next) state.meal = next[0] === "Brunch" ? "Lunch" : next[0];
-    else { state.meal = "Breakfast"; target = addDays(t, 1); }
-    const locate = (iso) => {
-      const wi = state.data.weeks.findIndex((w) => iso >= w.start && iso <= w.end);
-      if (wi < 0) return false;
-      const di = state.data.weeks[wi].days.findIndex((d) => d.date === iso);
-      if (di < 0) return false;
-      state.week = wi; state.day = di;
-      return true;
-    };
-    if (!locate(target) && !locate(t)) {
+    if (next) return { iso: t, meal: chip(next[0]) };
+    for (let i = 1; i <= 21; i++) {
+      const s = slotsFor(addDays(t, i))[0];
+      if (s) return { iso: addDays(t, i), meal: chip(s[0]) };
+    }
+    return { iso: addDays(t, 1), meal: "Breakfast" };
+  }
+  const locate = (iso) => {
+    const wi = state.data.weeks.findIndex((w) => iso >= w.start && iso <= w.end);
+    if (wi < 0) return false;
+    const di = state.data.weeks[wi].days.findIndex((d) => d.date === iso);
+    if (di < 0) return false;
+    state.week = wi; state.day = di;
+    return true;
+  };
+  // `auto` remembers the default view we last applied, so we can tell whether
+  // the user is still on it or has navigated away.
+  let auto = "";
+  const viewKey = () => state.data.weeks[state.week].days[state.day].date + "|" + state.meal;
+  function pickDefaults() {
+    const v = defaultView(), t = todayISO();
+    state.meal = v.meal;
+    if (!locate(v.iso) && !locate(t)) {
       state.week = t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1;
       state.day = 0;
     }
+    auto = viewKey();
   }
 
   // Sunday breakfast and lunch are one brunch menu; either chip shows it.
@@ -130,6 +173,46 @@
     head.append(d.date === today ? el("span", "pill", "Today") : el("span", "dt", fmt(d.date, { month: "short", day: "numeric" })));
     return head;
   }
+
+  // a link straight to one day's meal: ?d=2026-10-02&m=Dinner
+  const viewURL = (iso, meal) => {
+    const p = new URLSearchParams({ d: iso, m: meal });
+    return location.origin + location.pathname + "?" + p;
+  };
+  const SHARE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg>';
+  // Share sheet where there is one (phones, Safari), else copy the link.
+  // Two buttons: an icon in the card header (desktop) and a labelled one under
+  // the list (phones, where the header is hidden).
+  function shareButtons(d, meal, dishes) {
+    const title = `${meal.name} at Annenberg, ${fmt(d.date, { weekday: "long", month: "short", day: "numeric" })}`;
+    const url = viewURL(d.date, meal.name === "Brunch" ? state.meal : meal.name);
+    const onclick = async (e) => {
+      const b = e.currentTarget;
+      if (navigator.share) {
+        try { await navigator.share({ title, text: dishes.length ? `${title}: ${dishes.join(", ")}` : title, url }); } catch (_) {}
+        return;
+      }
+      try { await navigator.clipboard.writeText(url); } catch (_) { return; }
+      b.classList.add("copied");
+      const label = b.querySelector("span");
+      if (label) label.textContent = "Link copied";
+      b.title = "Link copied";
+      setTimeout(() => { b.classList.remove("copied"); if (label) label.textContent = "Share"; b.title = "Share this meal"; }, 1600);
+    };
+    const icon = el("button", "share icon");
+    icon.innerHTML = SHARE_SVG;
+    const bar = el("button", "share bar");
+    bar.innerHTML = SHARE_SVG;
+    bar.append(el("span", null, "Share"));
+    for (const b of [icon, bar]) { b.title = "Share this meal"; b.setAttribute("aria-label", "Share " + title); b.onclick = onclick; }
+    return [icon, bar];
+  }
+  // put the icon in the header and the labelled button at the end of the card
+  const addShare = (card, d, meal, dishes) => {
+    const [icon, bar] = shareButtons(d, meal, dishes);
+    card.querySelector(".dayhead").append(icon);
+    card.append(bar);
+  };
   function dayCard(d, today) {
     const card = el("article", "day");
     if (d.date === today) card.classList.add("today");
@@ -175,12 +258,14 @@
     // Brain Break is one small nightly spread: list all of it, plus the
     // self-serve basics that are out every night.
     if (meal.name === "Brain Break") {
-      card.append(el("p", "mealnote", "9 – 11 PM"));
+      const [, a, b] = HOURS.find(([n]) => n === "Brain Break");
+      card.append(el("p", "mealnote", span(a, b)));
       const sec = el("div", "grp");
       const ul = el("ul");
       meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false })));
       sec.append(ul);
       card.append(sec, el("p", "basics", "Plus cereal, bagels and bread, fruit, and drinks"));
+      addShare(card, d, meal, meal.categories.flatMap((c) => c.items).map((it) => it.name).slice(0, 6));
       return card;
     }
 
@@ -234,6 +319,7 @@
       sec.append(ul);
       card.append(sec);
     }
+    addShare(card, d, meal, buckets.get("Mains").map((it) => it.name).slice(0, 6));
     return card;
   }
 
@@ -265,6 +351,10 @@
     next.disabled = last;
     document.body.classList.toggle("searching", !!state.q);
     for (const chip of document.querySelectorAll(".chip")) chip.classList.toggle("on", !state.q && chip.dataset.meal === state.meal);
+    // keep the address bar on the current view (a plain URL on the default one)
+    const search = state.q ? "?" + new URLSearchParams({ q: q.value.trim() })
+      : viewKey() === auto ? "" : "?" + new URLSearchParams({ d: w.days[state.day].date, m: state.meal });
+    if (search !== location.search) history.replaceState(null, "", location.pathname + search);
 
     const cards = w.days.map((d, i) => {
       const c = renderDay(d, today);
@@ -431,9 +521,38 @@
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };
 
+  // Keyboard: ←/→ change day on phones and week on desktop (where the whole
+  // week is on screen), / jumps to search, 1–4 pick a meal.
+  document.addEventListener("keydown", (e) => {
+    if (!state.data || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+    if (e.target.closest("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
+    if (e.key === "/") { e.preventDefault(); q.focus(); return; }
+    if (/^[1-4]$/.test(e.key)) { document.querySelectorAll(".chip")[Number(e.key) - 1].click(); return; }
+    if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !state.q) {
+      e.preventDefault();
+      const dir = e.key === "ArrowLeft" ? -1 : 1;
+      if (!phone.matches) return goWeek(state.week + dir);
+      const to = step(dir);
+      if (to) goTo(to.week, to.day);
+    }
+  });
+
   updateStatus();
   setInterval(updateStatus, 30e3);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) updateStatus(); });
+  // Coming back to the page (often the installed app, left open overnight):
+  // re-fetch if the data is old, move on to the new default view if the user
+  // was still on the old one, and redraw so "Today" is right.
+  let loadedAt = 0;
+  const resume = () => {
+    updateStatus();
+    if (!state.data) return;
+    if (Date.now() - loadedAt > 30 * 60e3) return load();
+    if (viewKey() === auto) pickDefaults();
+    render();
+  };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
+  addEventListener("pageshow", (e) => { if (e.persisted) resume(); });
+  addEventListener("online", () => { if (state.data) load(); });
   document.addEventListener("click", (e) => { if (!e.target.closest("#status")) $("#status").open = false; });
 
   // add-to-home-screen: a corner button, hidden once running as an installed app
@@ -463,19 +582,43 @@
     addEventListener("appinstalled", () => { homeBtn.hidden = true; homeDlg.close(); });
   }
 
-  fetch("data/menu.json", { cache: "no-cache" })
-    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((data) => {
-      state.data = data;
-      pickDefaults();
-      render();
-      const t = new Date(data.generated);
-      const ageDays = (Date.now() - t.getTime()) / 864e5;
-      $("#updated").textContent = "Updated " + t.toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-      if (ageDays > 2) {
-        grid.before(el("p", "stale", "This menu hasn't refreshed in " + Math.floor(ageDays) + " days and may be out of date."));
-      }
-      if (data.source) $("#source").href = data.source;
-    })
-    .catch((e) => { grid.replaceChildren(el("p", "empty", "Couldn't load the menu (" + e.message + ")")); });
+  // First load: a ?d=&m=&q= link wins over the default view.
+  function initialView() {
+    pickDefaults();
+    const p = new URLSearchParams(location.search);
+    const m = MEALS.find((x) => x.toLowerCase() === (p.get("m") || "").toLowerCase());
+    if (p.get("d") && dayData(p.get("d"))) locate(p.get("d"));
+    if (m) state.meal = m;
+    if (p.get("q")) { q.value = p.get("q"); state.q = q.value.trim().toLowerCase(); }
+  }
+
+  function load() {
+    return fetch("data/menu.json", { cache: "no-cache" })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((data) => {
+        const old = state.data;
+        const wasDefault = old && viewKey() === auto;
+        const viewing = old && old.weeks[state.week].days[state.day].date;
+        state.data = data;
+        loadedAt = Date.now();
+        if (!old) initialView();
+        else if (wasDefault || !locate(viewing)) pickDefaults();
+        render();
+        updateStatus();
+        const t = new Date(data.generated);
+        const ageDays = (Date.now() - t.getTime()) / 864e5;
+        $("#updated").textContent = "Updated " + t.toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        const notes = [];
+        if (!navigator.onLine) notes.push("You're offline, so this is the menu saved on this device.");
+        if (ageDays > 2) notes.push("This menu hasn't refreshed in " + Math.floor(ageDays) + " days and may be out of date.");
+        document.querySelectorAll(".stale").forEach((n) => n.remove());
+        if (notes.length) grid.before(el("p", "stale", notes.join(" ")));
+        if (data.source) $("#source").href = data.source;
+      })
+      .catch((e) => { if (!state.data) grid.replaceChildren(el("p", "empty", "Couldn't load the menu (" + e.message + ")")); });
+  }
+  load();
+
+  // offline support (sw.js); failing to register just means no offline
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

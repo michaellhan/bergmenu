@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=dev">
 </head>
 <body>
   <header class="top">
@@ -33,13 +33,8 @@
     <details class="status" id="status">
       <summary><span class="dot"></span><span id="statusText">&nbsp;</span></summary>
       <div class="hours">
-        <table>
-          <tr><th>Breakfast</th><td>7:30 – 10:30 AM</td></tr>
-          <tr><th>Lunch</th><td>11:30 AM – 2 PM</td></tr>
-          <tr><th>Dinner</th><td>4:30 – 7:30 PM</td></tr>
-          <tr><th>Brain Break</th><td>9 – 11 PM <small>Sun–Thu</small></td></tr>
-        </table>
-        <p>Sundays are brunch: a continental breakfast, then the full brunch at 11:30. Brain Break is a late-night self-serve snack spread. Holidays and breaks differ.</p>
+        <table id="hoursTable"></table>
+        <p>Sundays are brunch: a continental breakfast, then the full brunch at 11:30. Brain Break is a late-night self-serve snack spread. Holidays and breaks differ; a meal with no menu posted shows as closed.</p>
       </div>
     </details>
     <nav class="controls" aria-label="View controls">
@@ -54,7 +49,7 @@
         <button class="chip" data-meal="Dinner">Dinner</button>
         <button class="chip" data-meal="Brain Break">Brain Break</button>
       </div>
-      <input type="search" id="q" class="search" placeholder="Search" aria-label="Search the menu" autocomplete="off">
+      <input type="search" id="q" class="search" placeholder="Search" aria-label="Search the menu" title="Search (/)" aria-keyshortcuts="/" autocomplete="off">
     </nav>
   </header>
 
@@ -103,6 +98,6 @@
     <form method="dialog"><button class="done">Done</button></form>
   </dialog>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=dev"></script>
 </body>
 </html>

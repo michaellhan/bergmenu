@@ -8,8 +8,19 @@ are hidden unless you tick **Show everything**.
 - `index.html`, `style.css`, `app.js` render it. No build step. Search covers every
   meal (staples included) across both weeks.
 - `manifest.webmanifest` and the icons make it installable from a phone's
-  "Add to Home Screen".
+  "Add to Home Screen". `sw.js` keeps it working offline with the last saved menu.
 - `.github/workflows/update.yml` re-scrapes every morning at 5 AM Eastern and publishes to GitHub Pages.
+  If a run fails it opens a "Menu update failing" issue (closed by the next good run).
+
+Links: `?d=2026-10-02&m=Dinner` opens a day and meal, `?q=tacos` a search. The
+address bar follows along as you browse, and each day has a share button.
+Keys: ←/→ change day (week on desktop), `/` searches, 1–4 pick a meal.
+
+## Hours
+
+Meal times live in `HOURS` in `app.js`, which also builds the hours popover.
+Holidays and breaks come from the data: a meal with no menu posted counts as
+closed in the open/closed status.
 
 ## Run locally
 
@@ -24,12 +35,21 @@ Then open http://localhost:8000.
 
 The site lives at https://bergmenu.com, served by GitHub Pages from this repo.
 The GitHub Action re-scrapes every morning (and on every push to `main`) and
-deploys the result. The old https://www.michael-han.com/berg/ URL redirects
+deploys the result. The build step swaps `?v=dev` on `style.css`/`app.js` for a
+hash of each file, and versions the service worker's cache the same way, so
+there's nothing to bump by hand. The old https://www.michael-han.com/berg/ URL redirects
 here. To publish by hand:
 
 ```bash
 scripts/deploy.sh
 ```
+
+## Duplicate names
+
+`ALIASES` in `scrape.py` maps HUDS's alternate names for one dish to a single
+name. Items at the Halal station that match a regular dish once "Halal" is
+dropped from the name (e.g. "Halal Meatballs in Marinara Sauce") are folded
+into that dish and tagged halal.
 
 ## How "staples" are decided
 

@@ -42,6 +42,12 @@ STAPLE_CATEGORIES = {
 STAPLE_MISSING_DAYS = 1
 MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break"]
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
+# HUDS sometimes lists the same dish under different names in one meal; map
+# each variant to one name so it shows once.
+ALIASES = {
+    "Hard Cooked Eggs - Cage Free": "Cage Free Hard Boiled Eggs",
+    "Hard Cooked Eggs": "Cage Free Hard Boiled Eggs",
+}
 
 
 def menu_url(d: dt.date) -> str:
@@ -97,6 +103,7 @@ def parse_day(page: str) -> list[dict]:
             # FoodPro silently cuts recipe names at 60 chars; mark the cut.
             if len(name) >= NAME_LIMIT:
                 name = name.rstrip(" &,/-") + "…"
+            name = ALIASES.get(name, name)
             if cur is None:
                 cur = "Other"
                 cats.setdefault(cur, [])
@@ -110,17 +117,23 @@ def parse_day(page: str) -> list[dict]:
     return meals
 
 
+def unhalal(name: str) -> str:
+    """'Halal Meatballs in Marinara Sauce' -> 'meatballs in marinara sauce'."""
+    return re.sub(r"\s+", " ", re.sub(r"\bhalal\b", "", name, flags=re.I)).strip().lower()
+
+
 def mark_halal_dupes(meals: list[dict]) -> None:
-    """The 'Halal' station repeats entrees listed elsewhere; fold them in."""
+    """The 'Halal' station repeats entrees listed elsewhere, sometimes as
+    'Halal <dish>'; fold them into the regular dish and tag it halal."""
     for meal in meals:
         halal = next((c for c in meal["categories"] if c["name"].lower() == "halal"), None)
         if not halal:
             continue
-        others = {it["name"]: it for c in meal["categories"] if c is not halal for it in c["items"]}
+        others = {unhalal(it["name"]): it for c in meal["categories"] if c is not halal for it in c["items"]}
         keep = []
         for it in halal["items"]:
-            if it["name"] in others:
-                o = others[it["name"]]
+            if unhalal(it["name"]) in others:
+                o = others[unhalal(it["name"])]
                 if "halal" not in o["tags"]:
                     o["tags"].append("halal")
             else:

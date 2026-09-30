@@ -13,6 +13,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: deploy
@@ -41,11 +42,41 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site/data
-          cp index.html style.css app.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
+          cp index.html style.css app.js sw.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
           cp data/menu.json _site/data/
           echo bergmenu.com > _site/CNAME
+          # Cache-bust by content: style.css?v=dev -> ?v=<hash of style.css>,
+          # and version the service worker's cache by the site's files.
+          h() { cat "$@" | sha256sum | cut -c1-10; }
+          sed -i "s/style\.css?v=dev/style.css?v=$(h style.css)/g; s/app\.js?v=dev/app.js?v=$(h app.js)/g" _site/index.html _site/sw.js
+          sed -i "s/^const VERSION = \"dev\";/const VERSION = \"$(h index.html style.css app.js sw.js manifest.webmanifest)\";/" _site/sw.js
+          if grep -n 'v=dev\|VERSION = "dev"' _site/index.html _site/sw.js; then exit 1; fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
       - name: Deploy to bergmenu.com
         uses: actions/deploy-pages@v4
+
+      # A failed run (usually HUDS changing its page) opens an issue, or
+      # comments on the open one; the next good run closes it.
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Menu update failing"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" -R "$GITHUB_REPOSITORY" --body "Failed again: $run"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "The scrape or deploy failed: $run. https://bergmenu.com is still serving the last good menu, and will show a stale-menu warning after 2 days."
+          fi
+      - name: Close failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list -R "$GITHUB_REPOSITORY" --state open --search '"Menu update failing" in:title' --json number -q '.[].number'); do
+            gh issue close "$n" -R "$GITHUB_REPOSITORY" --comment "Working again: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          done

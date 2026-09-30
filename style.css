@@ -303,3 +303,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
   .foot { margin-top: 28px; gap: 10px 18px; }
 }
+
+/* share: an icon in each card's header on desktop, a labelled button on phones */
+.dayhead .share { width: 26px; height: 22px; margin: -4px -6px -4px 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--faint); opacity: 0; transition: opacity 0.12s; }
+.dayhead .wd { margin-right: auto; }
+.day:hover .dayhead .share, .dayhead .share:focus-visible, .dayhead .share.copied { opacity: 1; }
+.dayhead .share:hover, .share.copied { color: var(--accent); }
+.share.bar { display: none; }
+.searching .share { display: none; }
+@media (hover: none) { .dayhead .share { opacity: 1; } }
+@media (max-width: 860px) {
+  .share.bar {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 0;
+    color: var(--muted); font-size: 14px;
+  }
+  .share.bar svg { color: var(--accent); }
+  .searching .share.bar { display: none; }
+}
