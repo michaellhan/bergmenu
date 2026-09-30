@@ -555,15 +555,16 @@
   addEventListener("online", () => { if (state.data) load(); });
   document.addEventListener("click", (e) => { if (!e.target.closest("#status")) $("#status").open = false; });
 
+  const ua = navigator.userAgent;
+  const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
+    : /Android/.test(ua) ? "android" : null;
+
   // add-to-home-screen: a corner button, hidden once running as an installed app
   const homeBtn = $("#homeBtn"), homeDlg = $("#homeDlg"), installBtn = $("#installBtn");
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   if (!standalone && homeDlg.showModal) {
     homeBtn.hidden = false;
     // show only this device's steps; desktops see both
-    const ua = navigator.userAgent;
-    const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
-      : /Android/.test(ua) ? "android" : null;
     if (os) homeDlg.querySelectorAll("section").forEach((s) => { s.hidden = s.dataset.os !== os; });
     homeBtn.onclick = () => homeDlg.showModal();
     homeDlg.onclick = (e) => { // tap the backdrop to close
@@ -580,6 +581,21 @@
       deferred = null; installBtn.hidden = true; homeDlg.close();
     };
     addEventListener("appinstalled", () => { homeBtn.hidden = true; homeDlg.close(); });
+  }
+
+  // The old michael-han.com/berg/ address redirects here with ?moved=1: ask
+  // those visitors to bookmark the new address (every time, until they do).
+  // render() rewrites the URL, which drops the flag.
+  const movedDlg = $("#movedDlg");
+  if (new URLSearchParams(location.search).has("moved") && movedDlg.showModal) {
+    movedDlg.querySelectorAll(".step").forEach((p) => { p.hidden = p.dataset.os !== (os || "desktop"); });
+    if (/Mac/.test(navigator.platform || ua)) $("#modKey").textContent = "⌘";
+    $("#movedHome").onclick = () => { movedDlg.close(); homeDlg.showModal(); };
+    movedDlg.onclick = (e) => { // tap the backdrop to close
+      const r = movedDlg.getBoundingClientRect();
+      if (e.target === movedDlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) movedDlg.close();
+    };
+    movedDlg.showModal();
   }
 
   // First load: a ?d=&m=&q= link wins over the default view.

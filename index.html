@@ -100,6 +100,16 @@
     <form method="dialog"><button class="done">Done</button></form>
   </dialog>
 
+  <dialog id="movedDlg" class="homedlg" aria-labelledby="movedTitle">
+    <h2 id="movedTitle">We've moved to bergmenu.com</h2>
+    <p class="lede">You came here from the old address, which won't work forever. Bookmark this page so you land here directly.</p>
+    <p class="step" data-os="ios">Tap <b>Share</b> <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg></span>, then <b>Add Bookmark</b>.</p>
+    <p class="step" data-os="android">Tap <b>⋮</b> in the top corner, then the <b>☆</b> star.</p>
+    <p class="step" data-os="desktop">Press <b><span id="modKey">Ctrl+</span>D</b> to bookmark this page.</p>
+    <p class="note">Opened it from a home screen icon? Delete that icon and <button type="button" id="movedHome" class="linkbtn">add this page instead</button>.</p>
+    <form method="dialog"><button class="done">Got it</button></form>
+  </dialog>
+
   <script src="app.js?v=dev"></script>
 </body>
 </html>
