@@ -22,10 +22,10 @@ Then open http://localhost:8000.
 
 ## Deploy
 
-The site lives at https://www.michael-han.com/berg/, served from the `berg/`
-folder of the `michaellhan/michaellhan.github.io` repo. The GitHub Action
-re-scrapes every morning and pushes the result there using a deploy key
-(`SITE_DEPLOY_KEY` secret). To publish by hand:
+The site lives at https://bergmenu.com, served by GitHub Pages from this repo.
+The GitHub Action re-scrapes every morning (and on every push to `main`) and
+deploys the result. The old https://www.michael-han.com/berg/ URL redirects
+here. To publish by hand:
 
 ```bash
 scripts/deploy.sh

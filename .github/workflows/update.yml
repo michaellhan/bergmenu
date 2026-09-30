@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: deploy
@@ -19,6 +21,9 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://bergmenu.com/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,22 +38,14 @@ jobs:
           git add data/menu.json
           git diff --cached --quiet || git commit -m "Update menu $(date -u +%F)"
           git push
-      - name: Publish to michael-han.com/berg
-        env:
-          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+      - name: Build site
         run: |
-          mkdir -p ~/.ssh
-          echo "$SITE_DEPLOY_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-          git clone -q --depth 1 git@github.com:michaellhan/michaellhan.github.io.git site
-          rm -rf site/berg && mkdir -p site/berg/data
-          cp index.html style.css app.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png site/berg/
-          cp data/menu.json site/berg/data/
-          cd site
-          git config user.name "menu-bot"
-          git config user.email "menu-bot@users.noreply.github.com"
-          git add -A berg
-          if git diff --cached --quiet; then echo "Site already up to date."; exit 0; fi
-          git commit -q -m "berg: update menu $(date -u +%F)"
-          git push -q origin main
+          mkdir -p _site/data
+          cp index.html style.css app.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
+          cp data/menu.json _site/data/
+          echo bergmenu.com > _site/CNAME
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to bergmenu.com
+        uses: actions/deploy-pages@v4
