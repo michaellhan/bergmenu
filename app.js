@@ -207,11 +207,16 @@
     for (const b of [icon, bar]) { b.title = "Share this meal"; b.setAttribute("aria-label", "Share " + title); b.onclick = onclick; }
     return [icon, bar];
   }
-  // put the icon in the header and the labelled button at the end of the card
+  // put the icon in the header, and the labelled button on the same line as
+  // "+ N more" (or at the end of the card when there's nothing more)
   const addShare = (card, d, meal, dishes) => {
     const [icon, bar] = shareButtons(d, meal, dishes);
     card.querySelector(".dayhead").append(icon);
-    card.append(bar);
+    const row = el("div", "cardfoot");
+    const more = card.querySelector(":scope > .more");
+    if (more) more.replaceWith(row), row.append(more);
+    else card.append(row);
+    row.append(bar);
   };
   function dayCard(d, today) {
     const card = el("article", "day");

@@ -347,10 +347,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .searching .share { display: none; }
 @media (hover: none) { .dayhead .share { opacity: 1; } }
 @media (max-width: 860px) {
+  .cardfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+  .cardfoot .more { margin: 0; }
   .share.bar {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 0;
-    color: var(--muted); font-size: 14px;
+    display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
+    padding: 5px 11px 5px 9px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); font-size: 13px;
   }
-  .share.bar svg { color: var(--accent); }
+  .share.bar:active { background: var(--line); }
+  .share.bar.copied { color: var(--accent); border-color: var(--accent); }
   .searching .share.bar { display: none; }
 }
