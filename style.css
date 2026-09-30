@@ -199,6 +199,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .foot a { color: var(--muted); text-decoration: none; }
 .foot a:hover { color: var(--ink); }
+.foot .credit { margin-left: auto; color: var(--faint); }
 
 /* add-to-home-screen button + sheet */
 .homebtn {
