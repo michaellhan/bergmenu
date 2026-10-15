@@ -40,7 +40,7 @@ KITCHENS = [
     ("kirkland", "14", "Kirkland"),
     ("leverett", "16", "Leverett"),
     ("lowell-quincy-winthrop", "17", "Lowell, Quincy & Winthrop"),
-    # grad school cafés: one all-day menu, weekdays
+    # grad school cafés: weekdays, one all-day menu (GSAS: lunch and dinner)
     ("hls", "70", "HLS Café"),
     ("hks", "56", "HKS"),
     ("gsd", "41", "GSD"),
@@ -62,7 +62,15 @@ STAPLE_CATEGORIES = {
 # meal is served, or all but this many (when the week has enough data to judge).
 # Sunday brunch replaces breakfast and lunch, so those run 6 days, dinner 7.
 STAPLE_MISSING_DAYS = 1
+# The grad cafés open weekdays only, often for fewer than 5 days of a posted
+# week, so they're judged over both weeks at once: an item is a staple if it's
+# there on at least this share of the days its meal is served. Their build-
+# your-own and grab-and-go stations are always the same.
+CAFES = {"70", "56", "41", "04", "57"}
+CAFE_STAPLE_SHARE = 0.6
+CAFE_STAPLE_CATEGORIES = {"craft bowls", "special bar", "misc", "miscellaneous"}
 MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break", "All Day"]
+ACRONYMS = {"BBQ", "BLT", "HKS", "HLS", "GSD", "SEC", "GSAS", "AS", "V", "VG"}
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
 # HUDS sometimes lists the same dish under different names in one meal; map
 # each variant to one name so it shows once.
@@ -129,6 +137,8 @@ def parse_day(page: str) -> list[dict]:
             # FoodPro silently cuts recipe names at 60 chars; mark the cut.
             if len(name) >= NAME_LIMIT:
                 name = name.rstrip(" &,/-") + "…"
+            # some kitchens type parts of names in capitals ("STIR FRY LO MEIN")
+            name = re.sub(r"\b[A-Z]{2,}\b", lambda w: w[0] if w[0] in ACRONYMS else w[0].capitalize(), name)
             name = ALIASES.get(name, name)
             if cur is None:
                 cur = "Other"
@@ -199,8 +209,9 @@ def merge_brunch(meals: list[dict]) -> list[dict]:
     return sorted([brunch] + rest, key=lambda m: MEAL_ORDER.index(m["name"]) if m["name"] in MEAL_ORDER else 99)
 
 
-def flag_staples(days: list[dict]) -> None:
+def flag_staples(days: list[dict], cafe: bool = False) -> None:
     """Flag items that are the same every day so the site can hide them."""
+    staple_cats = STAPLE_CATEGORIES | (CAFE_STAPLE_CATEGORIES if cafe else set())
     counts: dict[tuple[str, str], int] = collections.Counter()
     meal_days: dict[str, int] = collections.Counter()
     for d in days:
@@ -217,17 +228,19 @@ def flag_staples(days: list[dict]) -> None:
     staple_names = set()
     for (meal_name, item_name), c in counts.items():
         n = meal_days[meal_name]
-        if n >= 5 and c >= n - STAPLE_MISSING_DAYS:
+        if cafe and n >= 3 and c >= n * CAFE_STAPLE_SHARE:
+            staple_names.add(item_name)
+        elif n >= 5 and c >= n - STAPLE_MISSING_DAYS:
             staple_names.add(item_name)
     for d in days:
         for meal in d["meals"]:
             for c in meal["categories"]:
-                if c["name"].lower() in STAPLE_CATEGORIES:
+                if c["name"].lower() in staple_cats:
                     staple_names.update(it["name"] for it in c["items"])
     for d in days:
         for meal in d["meals"]:
             for c in meal["categories"]:
-                c["staple"] = c["name"].lower() in STAPLE_CATEGORIES
+                c["staple"] = c["name"].lower() in staple_cats
                 for it in c["items"]:
                     # Brain Break is one small spread; never hide any of it.
                     it["staple"] = meal["name"] != "Brain Break" and (c["staple"] or it["name"] in staple_names)
@@ -249,9 +262,12 @@ def build(loc: str, name: str, dates: list[dt.date], pages: list[str], today: dt
                 "meals": meals,
                 "url": menu_url(loc, d),
             })
-        flag_staples(days)
+        if loc not in CAFES:
+            flag_staples(days)
         if any(d["meals"] for d in days):
             weeks.append({"start": days[0]["date"], "end": days[-1]["date"], "days": days})
+    if loc in CAFES:
+        flag_staples([d for w in weeks for d in w["days"]], cafe=True)
     if not weeks or not any(d["meals"] for d in weeks[0]["days"]):
         return None
     return {

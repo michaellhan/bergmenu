@@ -24,6 +24,11 @@ page. Houses sharing a kitchen (Cabot & Pfoho, Dunster & Mather, Lowell, Quincy 
 Winthrop) share a file. `HALLS` in `app.js` lists the picker, each hall's file and its
 hours. The picked hall is remembered on the device; `?h=mather` links to one.
 
+The grad cafés use the same layout as the halls. Their stations mix the day's
+dishes with plain sides and condiments, so `groupOf` in `app.js` sorts those by
+name (`DISH`, `SIDE`, `CONDIMENT`). They open weekdays only, so `scrape.py` judges
+their staples over both weeks at once (`CAFE_STAPLE_SHARE`).
+
 Links: `?d=2026-10-02&m=Dinner` opens a day and meal, `?q=tacos` a search. The
 address bar follows along as you browse, and each day has a share button.
 Keys: ←/→ change day (week on desktop), `/` searches, 1–4 pick a meal.

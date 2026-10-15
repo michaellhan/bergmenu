@@ -9,21 +9,39 @@
   // (unlabelled, at the top), soup and dessert always show; sides sit behind
   // "more". Condiments, toppings and breads aren't dishes: they never count
   // toward "more" and show as a single "With" line once it's opened.
+  //
+  // The grad cafés have their own stations (CAFE_MAINS, plus pizza, paninis
+  // and an all-day breakfast). Those mix the day's dishes with plain sides and
+  // condiments, so items there are sorted by name: a protein or dish word
+  // makes a main, else a side word makes a side, and condiments are add-ons.
+  const CAFE_MAINS = ["station", "fresh fired", "plant forward", "global comforts",
+    "international cuisine", "comfort foods", "daily bowl"];
   const GROUPS = [
     ["Mains", ["entrees", "veg,vegan", "halal", "brunch", "chili bar/stew",
-               "breakfast entrees", "breakfast meats", "breakfast bakery"]],
-    ["Soup", ["today's soup"]],
+               "breakfast entrees", "breakfast meats", "breakfast bakery", ...CAFE_MAINS]],
+    ["Soup", ["today's soup", "daily soups"]],
+    ["Pizza & sandwiches", ["pizza", "paninis"]],
     ["Dessert", ["desserts", "miscellaneous"]],
     ["Sides", ["plant protein", "starch and potatoes", "vegetables", "delish"]],
+    ["Breakfast", ["breakfast"]],
   ];
-  const DEFAULT_OPEN = new Set(["Mains", "Soup", "Dessert"]);
+  const DEFAULT_OPEN = new Set(["Mains", "Soup", "Pizza & sandwiches", "Dessert"]);
   const PASTA = "whole grain pasta bar";
   const BREAD = /cornbread|bread|roll|hawaiian|biscuit|cracker|tortilla/i;
   const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|sugar|^banana$/i;
+  const CONDIMENT = /sauce|salsa|chutney|raita|sour cream|guacamole|pico de gallo|crema|dressing|vinaigrette|mayo|butter$|lettuce|^shredded|^diced|^sliced|^chopped|bacon bits|pickle|wedges|naan|garlic bread|cornbread|biscuits|chips|broth|^cheddar vegan$|^lettuce$/i;
+  const DISH = /chicken|beef|pork|tofu|salmon|fish|shrimp|cod\b|turkey|tempeh|seitan|paneer|egg|sausage|bacon|ham\b|burger|bowl|lo mein|pasta|penne|curry|stew|dal\b|chole|koshari|bajias|tikki|paella|casserole|mac & cheese|parmesan|ramen|pho|taco|burrito|quesadilla|banh mi|sandwich|wrap|sub\b|plate|fajita|gyro|souvlaki|ribs|barbacoa|carnitas|guisada|tagine|masala|potstickers|skillet|shakshuka|omelette|pancakes|waffles|french toast|quiche|scramble|hash\b/i;
+  const SIDE = /rice|potato|fries|tots|hashbrowns|beans|broccoli|carrots|zucchini|squash|kale|cabbage|spinach|vegetabl|corn|mushrooms|peppers|onions|cole slaw|salad|greens|orzo|noodles|quinoa|farro|lentils|chick ?peas|asparagus|eggplant|cauliflower|gomen|fossolia|starch|oatmeal|fruit|berries|bananas|oranges|pineapple|melon|cantaloupe|apples|yogurt|cottage cheese/i;
   // null = an add-on (the "Sides" station is all sauces, garnishes and bread)
   const groupOf = (cat, name) => {
     const c = cat.toLowerCase();
     if (c === "sides" || c === "bread choices") return null;
+    if (CAFE_MAINS.includes(c) || c === "breakfast") {
+      if (DISH.test(name)) return c === "breakfast" ? "Breakfast" : "Mains";
+      if (CONDIMENT.test(name)) return null;
+      if (SIDE.test(name)) return c === "breakfast" ? "Breakfast" : "Sides";
+      return c === "breakfast" ? "Breakfast" : "Mains";
+    }
     if (c === "chili bar/stew" && BREAD.test(name)) return null;
     if (c === "desserts" && TOPPING.test(name)) return null;
     for (const [g, names] of GROUPS) if (names.includes(c)) return g;
@@ -76,7 +94,7 @@
   // Houses that share a kitchen share a file. The grad cafés have no hours
   // here (so no open/closed line), and most post one all-day menu.
   const house = (id, name, file, hours = HOUSE_HOURS) => ({ id, name, file, group: "Houses", hours, note: HOUSE_NOTE, meals: HOUSE_MEALS });
-  const grad = (id, name, file, meals = ["All Day"]) => ({ id, name, file, group: "Grad schools", hours: [], meals, cafe: true });
+  const grad = (id, name, file, meals = ["All Day"]) => ({ id, name, file, group: "Grad schools", hours: [], meals });
   const HALLS = [
     { id: "annenberg", name: "Annenberg", file: "menu", group: "First-years", hours: BERG_HOURS, note: BERG_NOTE, meals: HOUSE_MEALS },
     house("adams", "Adams", "adams"),
@@ -316,12 +334,13 @@
     const card = dayCard(d, today);
     const meal = mealFor(d);
     if (!meal) {
-      const none = !d.meals.length ? "No menu posted" : state.meal === "Brain Break" ? "No Brain Break tonight" : "Not served";
+      // the grad cafés open weekdays only
+      const wknd = state.hall.group === "Grad schools" && /^S/.test(d.weekday);
+      const none = !d.meals.length ? (wknd ? "Closed weekends" : "No menu posted") : state.meal === "Brain Break" ? "No Brain Break tonight" : "Not served";
       card.append(el("p", "none", none));
       return card;
     }
     if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
-    if (state.hall.cafe) return renderStations(card, d, meal);
 
     // Brain Break is one small nightly spread: list all of it, plus the
     // self-serve basics that are out every night.
@@ -388,42 +407,6 @@
       card.append(sec);
     }
     addShare(card, d, meal, buckets.get("Mains").map((it) => it.name).slice(0, 6));
-    return card;
-  }
-
-  // The grad cafés' stations don't match the dining halls', so list each
-  // station under its own name, dropping staples unless "show everything".
-  const stationName = (n) => n.toLowerCase() === "station" ? "Today's station" : n;
-  function renderStations(card, d, meal) {
-    const byStation = new Map(), staples = [], seen = new Set();
-    for (const c of meal.categories) {
-      for (const it of c.items) {
-        if (seen.has(it.name)) continue;
-        seen.add(it.name);
-        if (c.staple || it.staple) { staples.push(it); continue; }
-        const k = stationName(c.name);
-        if (!byStation.has(k)) byStation.set(k, []);
-        byStation.get(k).push(it);
-      }
-    }
-    for (const [name, items] of byStation) {
-      const sec = el("div", "grp");
-      sec.append(el("h4", null, name));
-      const ul = el("ul");
-      items.forEach((it) => ul.append(itemLi(it)));
-      sec.append(ul);
-      card.append(sec);
-    }
-    if (!byStation.size) card.append(el("p", "none", "Nothing new"));
-    if (allBox.checked && staples.length) {
-      const sec = el("div", "grp staples");
-      sec.append(el("h4", null, "Every day"));
-      const ul = el("ul");
-      staples.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it)));
-      sec.append(ul);
-      card.append(sec);
-    }
-    addShare(card, d, meal, [...byStation.values()].flat().map((it) => it.name).slice(0, 6));
     return card;
   }
 
