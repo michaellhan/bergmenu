@@ -36,14 +36,14 @@ jobs:
         run: |
           git config user.name "menu-bot"
           git config user.email "menu-bot@users.noreply.github.com"
-          git add data/menu.json
+          git add data/
           git diff --cached --quiet || git commit -m "Update menu $(date -u +%F)"
           git push
       - name: Build site
         run: |
           mkdir -p _site/data
           cp index.html style.css app.js sw.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
-          cp data/menu.json _site/data/
+          cp data/*.json _site/data/
           echo bergmenu.com > _site/CNAME
           # Cache-bust by content: style.css?v=dev -> ?v=<hash of style.css>,
           # and version the service worker's cache by the site's files.

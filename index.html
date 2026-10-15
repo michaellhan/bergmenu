@@ -27,14 +27,14 @@
 <body>
   <header class="top">
     <div class="brand">
-      <h1>Annenberg</h1>
+      <h1><label class="hallpick"><select id="hall" aria-label="Dining hall"><option>Annenberg</option></select><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></label></h1>
       <p class="sub">What's new each day</p>
     </div>
     <details class="status" id="status">
       <summary><span class="dot"></span><span id="statusText">&nbsp;</span></summary>
       <div class="hours">
         <table id="hoursTable"></table>
-        <p>Sundays are brunch: a continental breakfast, then the full brunch at 11:30. Brain Break is a late-night self-serve snack spread. Holidays and breaks differ; a meal with no menu posted shows as closed.</p>
+        <p id="hoursNote"></p>
       </div>
     </details>
     <nav class="controls" aria-label="View controls">
@@ -43,12 +43,7 @@
         <span id="range" class="range">&nbsp;</span>
         <button id="next" class="icon" aria-label="Next week">&#8250;</button>
       </div>
-      <div class="chips" id="meals" role="group" aria-label="Meals">
-        <button class="chip" data-meal="Breakfast">Breakfast</button>
-        <button class="chip" data-meal="Lunch">Lunch</button>
-        <button class="chip" data-meal="Dinner">Dinner</button>
-        <button class="chip" data-meal="Brain Break">Brain Break</button>
-      </div>
+      <div class="chips" id="meals" role="group" aria-label="Meals"></div>
       <input type="search" id="q" class="search" placeholder="Search" aria-label="Search the menu" title="Search (/)" aria-keyshortcuts="/" autocomplete="off">
     </nav>
   </header>

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Scrape the Annenberg (HUDS) menu for this week and next into data/menu.json.
+"""Scrape the HUDS menus for this week and next: Annenberg into data/menu.json,
+every other kitchen in KITCHENS into data/<id>.json.
 
 Stdlib only. Run:  python3 scrape.py
 """
@@ -19,14 +20,35 @@ from zoneinfo import ZoneInfo
 BASE = "https://www.foodpro.huds.harvard.edu/foodpro/shtmenu.aspx"
 PARAMS = {
     "sName": "HARVARD UNIVERSITY DINING SERVICES",
-    "locationNum": "30",
-    "locationName": "Annenberg",
+    "locationName": "Dining Hall",
     "naFlag": "1",
     "WeeksMenus": "This Week's Menus",
     "myaction": "read",
 }
+# FoodPro calls nearly every kitchen "Dining Hall"; which number feeds which
+# House comes from the "Menu Offerings" links on HUDS's Dining Houses page
+# (https://www.dining.harvard.edu/undergraduate-dining/dining-houses).
+# Houses sharing a kitchen share a file; app.js maps each House to its file.
+KITCHENS = [
+    # (file id, FoodPro locationNum, name)
+    ("menu", "30", "Annenberg"),
+    ("adams", "09", "Adams"),
+    ("cabot-pfoho", "05", "Cabot & Pforzheimer"),
+    ("currier", "38", "Currier"),
+    ("dunster-mather", "07", "Dunster & Mather"),
+    ("eliot", "80", "Eliot"),
+    ("kirkland", "14", "Kirkland"),
+    ("leverett", "16", "Leverett"),
+    ("lowell-quincy-winthrop", "17", "Lowell, Quincy & Winthrop"),
+    # grad school cafés: one all-day menu, weekdays
+    ("hls", "70", "HLS Café"),
+    ("hks", "56", "HKS"),
+    ("gsd", "41", "GSD"),
+    ("gsas", "04", "GSAS Commons"),
+    ("sec", "57", "SEC"),
+]
 TZ = ZoneInfo("America/New_York")
-OUT = Path(__file__).parent / "data" / "menu.json"
+DATA = Path(__file__).parent / "data"
 WEEKS_AHEAD = 1  # this week + N more
 
 # Stations whose contents are essentially the same every day. Items in these
@@ -40,7 +62,7 @@ STAPLE_CATEGORIES = {
 # meal is served, or all but this many (when the week has enough data to judge).
 # Sunday brunch replaces breakfast and lunch, so those run 6 days, dinner 7.
 STAPLE_MISSING_DAYS = 1
-MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break"]
+MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break", "All Day"]
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
 # HUDS sometimes lists the same dish under different names in one meal; map
 # each variant to one name so it shows once.
@@ -50,8 +72,8 @@ ALIASES = {
 }
 
 
-def menu_url(d: dt.date) -> str:
-    q = dict(PARAMS, dtdate=f"{d.month}/{d.day}/{d.year}")
+def menu_url(loc: str, d: dt.date) -> str:
+    q = dict(PARAMS, locationNum=loc, dtdate=f"{d.month}/{d.day}/{d.year}")
     return BASE + "?" + urllib.parse.urlencode(q)
 
 
@@ -76,8 +98,12 @@ def parse_day(page: str) -> list[dict]:
     """Return [{name, categories: [{name, items: [{name, tags}]}]}] for one day."""
     meals = []
     parts = re.split(r'mealName=([A-Za-z+]+)"', page)
+    # the grad cafés post one all-day menu with no meal links
+    if len(parts) == 1 and "shortmenucats" in page:
+        parts = ["", "All Day", page]
     for i in range(1, len(parts), 2):
-        meal = clean(parts[i].replace("+", " ")).replace(" Menu", "")
+        meal = clean(parts[i].replace("+", " ")).replace(" Menu", "").title()
+        meal = {"Dinnner": "Dinner", "Fly By": "Fly-By"}.get(meal, meal)
         body = parts[i + 1]
         cats: "collections.OrderedDict[str, list]" = collections.OrderedDict()
         cur = None
@@ -207,14 +233,7 @@ def flag_staples(days: list[dict]) -> None:
                     it["staple"] = meal["name"] != "Brain Break" and (c["staple"] or it["name"] in staple_names)
 
 
-def main() -> int:
-    today = dt.datetime.now(TZ).date()
-    monday = today - dt.timedelta(days=today.weekday())
-    dates = [monday + dt.timedelta(days=i) for i in range(7 * (WEEKS_AHEAD + 1))]
-
-    with ThreadPoolExecutor(max_workers=7) as ex:
-        pages = list(ex.map(lambda d: fetch(menu_url(d)), dates))
-
+def build(loc: str, name: str, dates: list[dt.date], pages: list[str], today: dt.date) -> "dict | None":
     weeks = []
     for w in range(WEEKS_AHEAD + 1):
         days = []
@@ -228,27 +247,45 @@ def main() -> int:
                 "date": d.isoformat(),
                 "weekday": d.strftime("%A"),
                 "meals": meals,
-                "url": menu_url(d),
+                "url": menu_url(loc, d),
             })
         flag_staples(days)
         if any(d["meals"] for d in days):
             weeks.append({"start": days[0]["date"], "end": days[-1]["date"], "days": days})
-
     if not weeks or not any(d["meals"] for d in weeks[0]["days"]):
-        print("no menu data found; leaving existing file untouched", file=sys.stderr)
-        return 1
-
-    out = {
-        "location": "Annenberg",
+        return None
+    return {
+        "location": name,
         "generated": dt.datetime.now(TZ).isoformat(timespec="seconds"),
-        "source": menu_url(today),
+        "source": menu_url(loc, today),
         "weeks": weeks,
     }
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False) + "\n")
-    n_items = sum(len(c["items"]) for w in weeks for d in w["days"] for m in d["meals"] for c in m["categories"])
-    print(f"wrote {OUT} ({len(weeks)} weeks, {n_items} items)")
-    return 0
+
+
+def main() -> int:
+    today = dt.datetime.now(TZ).date()
+    monday = today - dt.timedelta(days=today.weekday())
+    dates = [monday + dt.timedelta(days=i) for i in range(7 * (WEEKS_AHEAD + 1))]
+
+    jobs = [(loc, d) for _, loc, _ in KITCHENS for d in dates]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        pages = list(ex.map(lambda j: fetch(menu_url(*j)), jobs))
+
+    DATA.mkdir(parents=True, exist_ok=True)
+    ok = True
+    for k, (fid, loc, name) in enumerate(KITCHENS):
+        out = build(loc, name, dates, pages[k * len(dates):(k + 1) * len(dates)], today)
+        path = DATA / f"{fid}.json"
+        if not out:
+            # Annenberg is the site's main menu, so a missing one fails the run;
+            # the others just keep their last good file (or none, between terms).
+            print(f"{name}: no menu data found; leaving {path.name} untouched", file=sys.stderr)
+            ok = ok and fid != "menu"
+            continue
+        path.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False) + "\n")
+        n_items = sum(len(c["items"]) for w in out["weeks"] for d in w["days"] for m in d["meals"] for c in m["categories"])
+        print(f"wrote {path} ({len(out['weeks'])} weeks, {n_items} items)")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

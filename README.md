@@ -4,13 +4,25 @@ A one-page site showing only what changes day to day on the Annenberg (HUDS)
 menu. Staples that appear every day (salad bar, grill, deli, yogurt bar, etc.)
 are hidden unless you tick **Show everything**.
 
-- `scrape.py` pulls this week and next from the HUDS FoodPro site into `data/menu.json` (stdlib only).
+- `scrape.py` pulls this week and next from the HUDS FoodPro site: Annenberg into `data/menu.json`,
+  every House kitchen and grad café in `KITCHENS` into `data/<id>.json` (stdlib only).
 - `index.html`, `style.css`, `app.js` render it. No build step. Search covers every
   meal (staples included) across both weeks.
 - `manifest.webmanifest` and the icons make it installable from a phone's
   "Add to Home Screen". `sw.js` keeps it working offline with the last saved menu.
 - `.github/workflows/update.yml` re-scrapes every morning at 5 AM Eastern and publishes to GitHub Pages.
   If a run fails it opens a "Menu update failing" issue (closed by the next good run).
+
+## Other dining halls
+
+The title is a picker: Annenberg (the default), each of the 12 Houses, and the
+grad cafés (Law School, Kennedy School, Design School, GSAS Commons, SEC). FoodPro
+calls most kitchens just "Dining Hall"; `KITCHENS` in `scrape.py` records which
+number feeds which House, from the "Menu Offerings" links on HUDS's
+[Dining Houses](https://www.dining.harvard.edu/undergraduate-dining/dining-houses)
+page. Houses sharing a kitchen (Cabot & Pfoho, Dunster & Mather, Lowell, Quincy &
+Winthrop) share a file. `HALLS` in `app.js` lists the picker, each hall's file and its
+hours. The picked hall is remembered on the device; `?h=mather` links to one.
 
 Links: `?d=2026-10-02&m=Dinner` opens a day and meal, `?q=tacos` a search. The
 address bar follows along as you browse, and each day has a share button.

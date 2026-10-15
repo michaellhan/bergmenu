@@ -3,7 +3,7 @@
   const $ = (s) => document.querySelector(s);
   const grid = $("#grid"), tabs = $("#daytabs"), range = $("#range");
   const prev = $("#prev"), next = $("#next"), allBox = $("#all"), q = $("#q");
-  const state = { data: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
+  const state = { data: null, hall: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
 
   // Collapse HUDS's many stations into a few groups, by station. Mains
   // (unlabelled, at the top), soup and dessert always show; sides sit behind
@@ -44,56 +44,107 @@
 
   const addDays = (iso, n) => { const d = parse(iso); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
 
-  // Annenberg hours in minutes after midnight, Eastern: the one place they're
-  // written down (the hours popover is built from this). Sunday lunch is
-  // brunch; Brain Break runs Sunday through Thursday nights.
+  // Hours in minutes after midnight, Eastern: the one place they're written
+  // down (the hours popover is built from this), from HUDS's Dining Houses
+  // page. Rows: [meal, start, end, weekdays (0 = Sun), note, no posted end].
+  // At Annenberg Sunday lunch is brunch; Brain Break runs Sunday through
+  // Thursday nights. The Houses list Brain Break with a start time only.
   const hm = (h, m = 0) => h * 60 + m;
-  const HOURS = [
+  const BERG_HOURS = [
     ["Breakfast", hm(7, 30), hm(10, 30)],
     ["Lunch", hm(11, 30), hm(14)],
     ["Dinner", hm(16, 30), hm(19, 30)],
     ["Brain Break", hm(21), hm(23), [0, 1, 2, 3, 4], "Sun–Thu"],
   ];
-  const MEALS = HOURS.map(([n]) => n);
+  const houseHours = (dinner) => [
+    ["Breakfast", hm(7, 30), hm(10, 30)],
+    ["Lunch", hm(11, 30), hm(14), [1, 2, 3, 4, 5], "Mon–Fri"],
+    ["Brunch", hm(11, 30), hm(14), [0, 6], "Sat & Sun"],
+    ...dinner,
+    ["Brain Break", hm(21), hm(23), [0, 1, 2, 3, 4], "Sun–Thu", true],
+  ];
+  const HOUSE_HOURS = houseHours([["Dinner", hm(17), hm(19, 30)]]);
+  const CURRIER_HOURS = houseHours([
+    ["Dinner", hm(17), hm(20), [0, 1, 2, 3, 4], "Sun–Thu"],
+    ["Dinner", hm(17), hm(19, 30), [5, 6], "Fri & Sat"],
+  ]);
+  const BERG_NOTE = "Sundays are brunch: a continental breakfast, then the full brunch at 11:30. Brain Break is a late-night self-serve snack spread. Holidays and breaks differ; a meal with no menu posted shows as closed.";
+  const HOUSE_NOTE = "Breakfast is continental, and weekend lunch is brunch. Brain Break is a late-night self-serve snack spread. Holidays and breaks differ; a meal with no menu posted shows as closed.";
+  const HOUSE_MEALS = ["Breakfast", "Lunch", "Dinner", "Brain Break"];
+
+  // Every hall the picker offers. `file` is data/<file>.json from scrape.py;
+  // Houses that share a kitchen share a file. The grad cafés have no hours
+  // here (so no open/closed line), and most post one all-day menu.
+  const house = (id, name, file, hours = HOUSE_HOURS) => ({ id, name, file, group: "Houses", hours, note: HOUSE_NOTE, meals: HOUSE_MEALS });
+  const grad = (id, name, file, meals = ["All Day"]) => ({ id, name, file, group: "Grad schools", hours: [], meals, cafe: true });
+  const HALLS = [
+    { id: "annenberg", name: "Annenberg", file: "menu", group: "First-years", hours: BERG_HOURS, note: BERG_NOTE, meals: HOUSE_MEALS },
+    house("adams", "Adams", "adams"),
+    house("cabot", "Cabot", "cabot-pfoho"),
+    house("currier", "Currier", "currier", CURRIER_HOURS),
+    house("dunster", "Dunster", "dunster-mather"),
+    house("eliot", "Eliot", "eliot"),
+    house("kirkland", "Kirkland", "kirkland"),
+    house("leverett", "Leverett", "leverett"),
+    house("lowell", "Lowell", "lowell-quincy-winthrop"),
+    house("mather", "Mather", "dunster-mather"),
+    house("pfoho", "Pforzheimer", "cabot-pfoho"),
+    house("quincy", "Quincy", "lowell-quincy-winthrop"),
+    house("winthrop", "Winthrop", "lowell-quincy-winthrop"),
+    grad("hls", "Law School", "hls"),
+    grad("hks", "Kennedy School", "hks"),
+    grad("gsd", "Design School", "gsd"),
+    grad("gsas", "GSAS Commons", "gsas", ["Lunch", "Dinner"]),
+    grad("sec", "SEC", "sec"),
+  ];
+  const DEFAULT_HALL = HALLS[0];
+  const hallById = (id) => HALLS.find((h) => h.id === (id || "").toLowerCase());
+  let HOURS = BERG_HOURS, MEALS = HOUSE_MEALS;
   const dayData = (iso) => {
     for (const w of state.data ? state.data.weeks : []) for (const d of w.days) if (d.date === iso) return d;
   };
   // Holidays and breaks: a day inside the scraped range with no posted meal
   // counts as closed for that meal. Outside the range, trust the schedule.
+  // (the Houses' Saturday brunch is posted as lunch)
   const served = (d, slot) => d.meals.some((m) => m.name === slot
-    || (m.name === "Brunch" && (slot === "Breakfast" || slot === "Lunch" || slot === "Brunch")));
+    || (m.name === "Brunch" && (slot === "Breakfast" || slot === "Lunch"))
+    || (m.name === "Lunch" && slot === "Brunch"));
   const slotsFor = (iso) => {
     const wd = parse(iso).getDay(), d = dayData(iso);
     return HOURS.filter(([, , , days]) => !days || days.includes(wd))
-      .map(([n, a, b]) => [wd === 0 && n === "Lunch" ? "Brunch" : n, a, b])
+      .map(([n, a, b, , , open]) => [wd === 0 && n === "Lunch" ? "Brunch" : n, a, b, open])
       .filter(([n]) => !d || served(d, n));
   };
   const clock = (m, ampm = true) => {
     const h = Math.floor(m / 60) % 24, mm = m % 60;
     return `${h % 12 || 12}${mm ? ":" + String(mm).padStart(2, "0") : ""}${ampm ? (h < 12 ? " AM" : " PM") : ""}`;
   };
-  // "7:30 – 10:30 AM", "11:30 AM – 2 PM"
-  const span = (a, b) => `${clock(a, (a < 720) !== (b < 720))} – ${clock(b)}`;
+  // "7:30 – 10:30 AM", "11:30 AM – 2 PM", "from 9 PM"
+  const span = (a, b, open) => open ? `from ${clock(a)}` : `${clock(a, (a < 720) !== (b < 720))} – ${clock(b)}`;
 
-  (() => {
+  function buildHours() {
     const table = $("#hoursTable");
-    for (const [n, a, b, , note] of HOURS) {
+    table.replaceChildren();
+    for (const [n, a, b, , note, open] of HOURS) {
       const tr = el("tr");
-      const td = el("td", null, span(a, b));
+      const td = el("td", null, span(a, b, open));
       if (note) td.append(" ", el("small", null, note));
       tr.append(el("th", null, n), td);
       table.append(tr);
     }
-  })();
+    $("#hoursNote").textContent = state.hall.note || "";
+  }
 
   function updateStatus() {
     const { iso, mins } = nowParts();
     const box = $("#status"), text = $("#statusText");
+    box.hidden = !HOURS.length;
+    if (!HOURS.length) return;
     const cur = slotsFor(iso).find(([, a, b]) => mins >= a && mins < b);
     let msg;
     if (cur) {
       const left = cur[2] - mins;
-      msg = `Open · ${cur[0]} ${left <= 30 ? `ends in ${left} min` : `until ${clock(cur[2])}`}`;
+      msg = cur[3] ? `Open · ${cur[0]}` : `Open · ${cur[0]} ${left <= 30 ? `ends in ${left} min` : `until ${clock(cur[2])}`}`;
     } else {
       const next = slotsFor(iso).find(([, a]) => a > mins);
       if (next) {
@@ -119,6 +170,14 @@
   // after the last one, the first meal of the next day that's open.
   function defaultView() {
     const { iso: t, mins } = nowParts();
+    // no hours (the grad cafés): the first day from today with a menu
+    if (!HOURS.length) {
+      for (let i = 0; i <= 21; i++) {
+        const d = dayData(addDays(t, i));
+        if (d && d.meals.length) return { iso: d.date, meal: (MEALS.find((m) => d.meals.some((x) => x.name === m)) || MEALS[0]) };
+      }
+      return { iso: t, meal: MEALS[0] };
+    }
     const chip = (slot) => slot === "Brunch" ? "Lunch" : slot;
     const next = slotsFor(t).find(([, , end]) => mins < end);
     if (next) return { iso: t, meal: chip(next[0]) };
@@ -174,9 +233,11 @@
     return head;
   }
 
-  // a link straight to one day's meal: ?d=2026-10-02&m=Dinner
+  // a link straight to one day's meal: ?h=mather&d=2026-10-02&m=Dinner
+  // (no h for Annenberg)
+  const hallParam = () => state.hall === DEFAULT_HALL ? {} : { h: state.hall.id };
   const viewURL = (iso, meal) => {
-    const p = new URLSearchParams({ d: iso, m: meal });
+    const p = new URLSearchParams({ ...hallParam(), d: iso, m: meal });
     return location.origin + location.pathname + "?" + p;
   };
   const SHARE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg>';
@@ -184,7 +245,7 @@
   // Two buttons: an icon in the card header (desktop) and a labelled one under
   // the list (phones, where the header is hidden).
   function shareButtons(d, meal, dishes) {
-    const title = `${meal.name} at Annenberg, ${fmt(d.date, { weekday: "long", month: "short", day: "numeric" })}`;
+    const title = `${meal.name === "All Day" ? "Menu" : meal.name} at ${state.hall.name}, ${fmt(d.date, { weekday: "long", month: "short", day: "numeric" })}`;
     const url = viewURL(d.date, meal.name === "Brunch" ? state.meal : meal.name);
     const onclick = async (e) => {
       const b = e.currentTarget;
@@ -259,12 +320,13 @@
       return card;
     }
     if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
+    if (state.hall.cafe) return renderStations(card, d, meal);
 
     // Brain Break is one small nightly spread: list all of it, plus the
     // self-serve basics that are out every night.
     if (meal.name === "Brain Break") {
-      const [, a, b] = HOURS.find(([n]) => n === "Brain Break");
-      card.append(el("p", "mealnote", span(a, b)));
+      const bb = HOURS.find(([n]) => n === "Brain Break");
+      if (bb) card.append(el("p", "mealnote", span(bb[1], bb[2], bb[5])));
       const sec = el("div", "grp");
       const ul = el("ul");
       meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false })));
@@ -328,6 +390,42 @@
     return card;
   }
 
+  // The grad cafés' stations don't match the dining halls', so list each
+  // station under its own name, dropping staples unless "show everything".
+  const stationName = (n) => n.toLowerCase() === "station" ? "Today's station" : n;
+  function renderStations(card, d, meal) {
+    const byStation = new Map(), staples = [], seen = new Set();
+    for (const c of meal.categories) {
+      for (const it of c.items) {
+        if (seen.has(it.name)) continue;
+        seen.add(it.name);
+        if (c.staple || it.staple) { staples.push(it); continue; }
+        const k = stationName(c.name);
+        if (!byStation.has(k)) byStation.set(k, []);
+        byStation.get(k).push(it);
+      }
+    }
+    for (const [name, items] of byStation) {
+      const sec = el("div", "grp");
+      sec.append(el("h4", null, name));
+      const ul = el("ul");
+      items.forEach((it) => ul.append(itemLi(it)));
+      sec.append(ul);
+      card.append(sec);
+    }
+    if (!byStation.size) card.append(el("p", "none", "Nothing new"));
+    if (allBox.checked && staples.length) {
+      const sec = el("div", "grp staples");
+      sec.append(el("h4", null, "Every day"));
+      const ul = el("ul");
+      staples.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it)));
+      sec.append(ul);
+      card.append(sec);
+    }
+    addShare(card, d, meal, [...byStation.values()].flat().map((it) => it.name).slice(0, 6));
+    return card;
+  }
+
   const countHits = (w) => {
     let n = 0;
     for (const d of w.days) for (const m of d.meals) for (const c of m.categories) {
@@ -356,9 +454,10 @@
     next.disabled = last;
     document.body.classList.toggle("searching", !!state.q);
     for (const chip of document.querySelectorAll(".chip")) chip.classList.toggle("on", !state.q && chip.dataset.meal === state.meal);
-    // keep the address bar on the current view (a plain URL on the default one)
-    const search = state.q ? "?" + new URLSearchParams({ q: q.value.trim() })
-      : viewKey() === auto ? "" : "?" + new URLSearchParams({ d: w.days[state.day].date, m: state.meal });
+    // keep the address bar on the current view (a plain URL on Annenberg's default one)
+    const params = state.q ? { ...hallParam(), q: q.value.trim() }
+      : viewKey() === auto ? hallParam() : { ...hallParam(), d: w.days[state.day].date, m: state.meal };
+    const search = Object.keys(params).length ? "?" + new URLSearchParams(params) : "";
     if (search !== location.search) history.replaceState(null, "", location.pathname + search);
 
     const cards = w.days.map((d, i) => {
@@ -401,9 +500,61 @@
     try { localStorage.setItem("berg.all", allBox.checked ? "1" : "0"); } catch (_) {}
     render();
   };
-  for (const chip of document.querySelectorAll(".chip")) {
-    chip.onclick = () => { state.meal = chip.dataset.meal; state.q = ""; q.value = ""; render(); };
+  // the meal chips for this hall (none for a café with one all-day menu)
+  function buildChips() {
+    const box = $("#meals");
+    box.hidden = MEALS.length < 2;
+    box.replaceChildren(...MEALS.map((m) => {
+      const chip = el("button", "chip", m);
+      chip.dataset.meal = m;
+      chip.onclick = () => { state.meal = m; state.q = ""; q.value = ""; render(); };
+      return chip;
+    }));
   }
+
+  // The hall picker is the page title. A native select, sized to the chosen
+  // name so the chevron sits right after it.
+  const hallSel = $("#hall");
+  (() => {
+    const groups = new Map();
+    for (const h of HALLS) {
+      if (!groups.has(h.group)) groups.set(h.group, Object.assign(el("optgroup"), { label: h.group }));
+      groups.get(h.group).append(Object.assign(el("option", null, h.name), { value: h.id }));
+    }
+    hallSel.replaceChildren(...groups.values());
+  })();
+  const fitHall = () => {
+    const probe = el("span", "hallprobe", state.hall.name);
+    hallSel.after(probe);
+    hallSel.style.width = Math.ceil(probe.getBoundingClientRect().width) + 34 + "px";
+    probe.remove();
+  };
+  if (document.fonts) document.fonts.ready.then(() => state.hall && fitHall());
+
+  function setHall(h) {
+    state.hall = h;
+    HOURS = h.hours;
+    MEALS = h.meals;
+    hallSel.value = h.id;
+    fitHall();
+    const shared = HALLS.filter((o) => o.file === h.file && o !== h).map((o) => o.name);
+    $(".brand .sub").textContent = shared.length ? `Same menu as ${shared.join(" & ")}` : "What's new each day";
+    document.title = `${h.name} Menu`;
+    buildHours();
+    buildChips();
+    updateStatus();
+  }
+  hallSel.onchange = () => {
+    const h = hallById(hallSel.value) || DEFAULT_HALL;
+    try { localStorage.setItem("berg.hall", h.id); } catch (_) {}
+    const sameFile = h.file === state.hall.file;
+    setHall(h);
+    state.open.clear();
+    if (sameFile && state.data) { pickDefaults(); render(); return; }
+    state.data = null;
+    grid.replaceChildren(el("p", "loading", "Loading menu…"));
+    load();
+  };
   // Swipe between days on phones. The list follows the finger with the next or
   // previous day peeking in from the side. Touch events rather than pointer
   // events so we can cancel touchmove: iOS Safari ignores `pan-y pinch-zoom`,
@@ -532,7 +683,7 @@
     if (!state.data || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
     if (e.target.closest("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
     if (e.key === "/") { e.preventDefault(); q.focus(); return; }
-    if (/^[1-4]$/.test(e.key)) { document.querySelectorAll(".chip")[Number(e.key) - 1].click(); return; }
+    if (/^[1-4]$/.test(e.key)) { const c = document.querySelectorAll(".chip")[Number(e.key) - 1]; if (c) c.click(); return; }
     if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !state.q) {
       e.preventDefault();
       const dir = e.key === "ArrowLeft" ? -1 : 1;
@@ -542,7 +693,10 @@
     }
   });
 
-  updateStatus();
+  // ?h= wins, then the hall picked last time on this device, then Annenberg
+  let saved = null;
+  try { saved = localStorage.getItem("berg.hall"); } catch (_) {}
+  setHall(hallById(new URLSearchParams(location.search).get("h")) || hallById(saved) || DEFAULT_HALL);
   setInterval(updateStatus, 30e3);
   // Coming back to the page (often the installed app, left open overnight):
   // re-fetch if the data is old, move on to the new default view if the user
@@ -613,17 +767,22 @@
     if (p.get("q")) { q.value = p.get("q"); state.q = q.value.trim().toLowerCase(); }
   }
 
+  let firstLoad = true;
   function load() {
-    return fetch("data/menu.json", { cache: "no-cache" })
+    const hall = state.hall;
+    return fetch(`data/${hall.file}.json`, { cache: "no-cache" })
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((data) => {
+        if (hall.file !== state.hall.file) return; // switched hall meanwhile
         const old = state.data;
         const wasDefault = old && viewKey() === auto;
         const viewing = old && old.weeks[state.week].days[state.day].date;
         state.data = data;
         loadedAt = Date.now();
-        if (!old) initialView();
+        if (!old && firstLoad) initialView();
+        else if (!old) pickDefaults();
         else if (wasDefault || !locate(viewing)) pickDefaults();
+        firstLoad = false;
         render();
         updateStatus();
         const t = new Date(data.generated);
@@ -636,7 +795,7 @@
         if (notes.length) grid.before(el("p", "stale", notes.join(" ")));
         if (data.source) $("#source").href = data.source;
       })
-      .catch((e) => { if (!state.data) grid.replaceChildren(el("p", "empty", "Couldn't load the menu (" + e.message + ")")); });
+      .catch((e) => { if (!state.data && hall.file === state.hall.file) grid.replaceChildren(el("p", "empty", "Couldn't load the menu (" + e.message + ")")); });
   }
   load();
 
