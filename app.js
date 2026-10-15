@@ -202,6 +202,7 @@
   function pickDefaults() {
     const v = defaultView(), t = todayISO();
     state.meal = v.meal;
+    wantMeal = null;
     if (!locate(v.iso) && !locate(t)) {
       state.week = t < state.data.weeks[0].start ? 0 : state.data.weeks.length - 1;
       state.day = 0;
@@ -507,7 +508,7 @@
     box.replaceChildren(...MEALS.map((m) => {
       const chip = el("button", "chip", m);
       chip.dataset.meal = m;
-      chip.onclick = () => { state.meal = m; state.q = ""; q.value = ""; render(); };
+      chip.onclick = () => { state.meal = m; wantMeal = null; state.q = ""; q.value = ""; render(); };
       return chip;
     }));
   }
@@ -570,13 +571,27 @@
     buildChips();
     updateStatus();
   }
+  // Switching halls keeps the day and meal you're on (and any search), so you
+  // can compare one meal across halls; a meal the new hall doesn't serve (the
+  // cafés' all-day menu) falls back to its default, but is still the one
+  // shown on switching back. `wantMeal` is that meal.
+  let carry = null, wantMeal = null;
+  function keepView(v) {
+    pickDefaults();
+    if (!v) return;
+    locate(v.iso);
+    if (MEALS.includes(v.meal)) state.meal = v.meal;
+    wantMeal = v.meal;
+  }
   function pickHall(h) {
     if (h === state.hall) return;
     try { localStorage.setItem("berg.hall", h.id); } catch (_) {}
     const sameFile = h.file === state.hall.file;
+    const v = state.data && { iso: state.data.weeks[state.week].days[state.day].date, meal: wantMeal || state.meal };
     setHall(h);
     state.open.clear();
-    if (sameFile && state.data) { pickDefaults(); render(); return; }
+    if (sameFile && state.data) { keepView(v); render(); return; }
+    carry = v;
     state.data = null;
     grid.replaceChildren(el("p", "loading", "Loading menu…"));
     load();
@@ -806,7 +821,7 @@
         state.data = data;
         loadedAt = Date.now();
         if (!old && firstLoad) initialView();
-        else if (!old) pickDefaults();
+        else if (!old) { keepView(carry); carry = null; }
         else if (wasDefault || !locate(viewing)) pickDefaults();
         firstLoad = false;
         render();
