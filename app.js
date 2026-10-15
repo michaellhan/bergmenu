@@ -512,31 +512,57 @@
     }));
   }
 
-  // The hall picker is the page title. A native select, sized to the chosen
-  // name so the chevron sits right after it.
-  const hallSel = $("#hall");
+  // The hall picker is the page title: a button that opens a popover of
+  // halls, grouped, in the same style as the hours popover.
+  const hallBtn = $("#hallBtn"), hallMenu = $("#hallMenu");
   (() => {
     const groups = new Map();
     for (const h of HALLS) {
-      if (!groups.has(h.group)) groups.set(h.group, Object.assign(el("optgroup"), { label: h.group }));
-      groups.get(h.group).append(Object.assign(el("option", null, h.name), { value: h.id }));
+      if (!groups.has(h.group)) {
+        const sec = el("div", "hallgrp");
+        sec.append(el("h4", null, h.group), el("div", "hallopts"));
+        groups.set(h.group, sec);
+      }
+      const opt = el("button", "hallopt", h.name);
+      opt.setAttribute("role", "option");
+      opt.dataset.id = h.id;
+      opt.tabIndex = -1;
+      opt.onclick = () => { closeHalls(true); pickHall(h); };
+      groups.get(h.group).lastChild.append(opt);
     }
-    hallSel.replaceChildren(...groups.values());
+    hallMenu.replaceChildren(...groups.values());
   })();
-  const fitHall = () => {
-    const probe = el("span", "hallprobe", state.hall.name);
-    hallSel.after(probe);
-    hallSel.style.width = Math.ceil(probe.getBoundingClientRect().width) + 34 + "px";
-    probe.remove();
+  const hallOpts = () => [...hallMenu.querySelectorAll(".hallopt")];
+  function openHalls() {
+    hallMenu.hidden = false;
+    hallBtn.setAttribute("aria-expanded", "true");
+    $("#status").open = false;
+    (hallMenu.querySelector('[aria-selected="true"]') || hallOpts()[0]).focus();
+  }
+  function closeHalls(refocus) {
+    if (hallMenu.hidden) return;
+    hallMenu.hidden = true;
+    hallBtn.setAttribute("aria-expanded", "false");
+    if (refocus) hallBtn.focus();
+  }
+  hallBtn.onclick = () => (hallMenu.hidden ? openHalls() : closeHalls());
+  hallBtn.onkeydown = (e) => { if (e.key === "ArrowDown") { e.preventDefault(); openHalls(); } };
+  // arrows move through the halls in reading order (the Houses sit in two columns)
+  hallMenu.onkeydown = (e) => {
+    const opts = hallOpts(), i = opts.indexOf(document.activeElement);
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (step) { e.preventDefault(); opts[(i + step + opts.length) % opts.length].focus(); }
+    else if (e.key === "Home" || e.key === "End") { e.preventDefault(); opts[e.key === "Home" ? 0 : opts.length - 1].focus(); }
+    else if (e.key === "Escape" || e.key === "Tab") { if (e.key === "Escape") e.preventDefault(); closeHalls(e.key === "Escape"); }
   };
-  if (document.fonts) document.fonts.ready.then(() => state.hall && fitHall());
+  document.addEventListener("click", (e) => { if (!e.target.closest(".hallpick")) closeHalls(); });
 
   function setHall(h) {
     state.hall = h;
     HOURS = h.hours;
     MEALS = h.meals;
-    hallSel.value = h.id;
-    fitHall();
+    $("#hallName").textContent = h.name;
+    for (const o of hallOpts()) o.setAttribute("aria-selected", String(o.dataset.id === h.id));
     const shared = HALLS.filter((o) => o.file === h.file && o !== h).map((o) => o.name);
     $(".brand .sub").textContent = shared.length ? `Same menu as ${shared.join(" & ")}` : "What's new each day";
     document.title = `${h.name} Menu`;
@@ -544,8 +570,8 @@
     buildChips();
     updateStatus();
   }
-  hallSel.onchange = () => {
-    const h = hallById(hallSel.value) || DEFAULT_HALL;
+  function pickHall(h) {
+    if (h === state.hall) return;
     try { localStorage.setItem("berg.hall", h.id); } catch (_) {}
     const sameFile = h.file === state.hall.file;
     setHall(h);
@@ -554,7 +580,7 @@
     state.data = null;
     grid.replaceChildren(el("p", "loading", "Loading menu…"));
     load();
-  };
+  }
   // Swipe between days on phones. The list follows the finger with the next or
   // previous day peeking in from the side. Touch events rather than pointer
   // events so we can cancel touchmove: iOS Safari ignores `pan-y pinch-zoom`,
