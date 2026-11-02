@@ -4,7 +4,7 @@
 //   POST /unlock  {password}: 204 if it's right
 //   POST /fixes   {password, fixes}: saves them (a null fix clears that meal's)
 //
-// A fix is {remove: [names], add: [{name, group}], note} and replaces the
+// A fix is {remove: [names], add: [{name, group}]} and replaces the
 // meal's previous one. They're kept in KV (FIXES) under one key; the password
 // is the PASSWORD secret. Wrong guesses are limited per IP.
 const ORIGIN = /^(https:\/\/bergmenu\.com|http:\/\/localhost(:\d+)?)$/;
@@ -32,7 +32,6 @@ export function clean(key, fix) {
     if (!a || !GROUPS.has(a.group)) throw new Error(`bad dish ${JSON.stringify(a)}`);
     (out.add ||= []).push({ name: text(a.name, 120), group: a.group });
   }
-  if (fix.note) out.note = text(fix.note, 200);
   return Object.keys(out).length ? out : null;
 }
 

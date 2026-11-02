@@ -36,7 +36,7 @@ Keys: ←/→ change day (week on desktop), `/` searches, 1–4 pick a meal.
 ## Fixing the menu
 
 When HUDS's menu is wrong, **Edit menu** in the footer unlocks an editor (the
-password, once per device): remove a dish (×), add one, or leave a note on a meal.
+password, once per device): remove a dish (×) or add one.
 **Save** is live for everyone straight away.
 
 Fixes are kept by a small Cloudflare Worker (`worker/`), which checks the password

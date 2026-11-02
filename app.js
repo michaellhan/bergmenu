@@ -356,8 +356,7 @@
       return card;
     }
     if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
-    if (meal.note && !edit) card.append(el("p", "fixnote", meal.note));
-    // while editing, the day's add-a-dish and note sit at the top, in reach
+    // while editing, adding a dish sits at the top of the day, in reach
     if (edit) card.append(editBox(fk));
 
     // Brain Break is one small nightly spread: list all of it, plus the
@@ -821,7 +820,7 @@
   }
 
   // Fixes. Editors (anyone with the password) correct what HUDS got wrong:
-  // drop a dish, add one, or leave a note on a meal. Fixes are kept by a small
+  // drop a dish or add one. Fixes are kept by a small
   // Cloudflare Worker (worker/), keyed "<file>|<date>|<meal>", and laid over
   // the scraped menu here, so the daily re-scrape doesn't undo them. The Worker
   // checks the password, so saving is live for everyone at once.
@@ -845,7 +844,6 @@
     const o = {};
     if (f.remove && f.remove.length) o.remove = [...new Set(f.remove)].sort();
     if (f.add && f.add.length) o.add = f.add;
-    if (f.note && f.note.trim()) o.note = f.note.trim();
     return Object.keys(o).length ? o : null;
   };
   const changed = () => [...edit.draft].filter(([k, f]) => JSON.stringify(tidy(f)) !== JSON.stringify(tidy(savedFix(k))));
@@ -854,10 +852,10 @@
   function applyFixes(raw) {
     const data = structuredClone(raw);
     for (const w of data.weeks) for (const d of w.days) {
-      // a meal HUDS didn't post, given dishes or a note
+      // a meal HUDS didn't post, given dishes
       for (const name of MEALS) {
         const f = fixFor(fixKey(d.date, name));
-        if (f && !d.meals.some((m) => m.name === name) && ((f.add && f.add.length) || f.note)) d.meals.push({ name, categories: [] });
+        if (f && !d.meals.some((m) => m.name === name) && f.add && f.add.length) d.meals.push({ name, categories: [] });
       }
       for (const m of d.meals) {
         const f = fixFor(fixKey(d.date, m.name));
@@ -867,7 +865,6 @@
           c.items = edit ? c.items.map((it) => (rm.has(it.name) ? { ...it, removed: true } : it)) : c.items.filter((it) => !rm.has(it.name));
         }
         if (f.add && f.add.length) m.categories.push({ name: "Added", staple: false, items: f.add.map((a) => ({ name: a.name, tags: [], staple: false, group: a.group, added: true })) });
-        if (f.note) m.note = f.note;
       }
     }
     return data;
@@ -883,12 +880,12 @@
   // an edit to one meal's fix, from what's in force now
   function change(fk, fn, rerender = true) {
     const cur = fixFor(fk) || {};
-    const f = { remove: [...(cur.remove || [])], add: [...(cur.add || [])], note: cur.note || "" };
+    const f = { remove: [...(cur.remove || [])], add: [...(cur.add || [])] };
     fn(f);
     edit.draft.set(fk, f);
     rerender ? refresh() : updateBar();
   }
-  // under each card while editing: add a dish, and the meal's note
+  // at the top of each card while editing: add a dish
   function editBox(fk) {
     const box = el("div", "editbox");
     box.dataset.fk = fk;
@@ -911,16 +908,7 @@
       edit.refocus = fk;
       change(fk, (f) => { f.add = f.add.filter((a) => a.name !== n); f.add.push({ name: n, group: grp.value }); f.remove = f.remove.filter((r) => r !== n); });
     };
-    const note = el("input", "note");
-    note.placeholder = "Add a note";
-    note.title = "A note on this meal for everyone, e.g. Closed for Thanksgiving";
-    note.maxLength = 200;
-    note.setAttribute("aria-label", "Note for this meal");
-    note.value = (fixFor(fk) || {}).note || "";
-    note.enterKeyHint = "done";
-    note.oninput = () => change(fk, (f) => { f.note = note.value; }, false);
-    note.onkeydown = (e) => { if (e.key === "Enter") note.blur(); };
-    box.append(row, note);
+    box.append(row);
     return box;
   }
 

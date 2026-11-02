@@ -394,11 +394,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .searching .share.bar { display: none; }
 }
 
-/* fixes: a meal's note, and editing (unlocked from "Edit menu" in the footer) */
-.fixnote {
-  margin: 8px 0 4px; padding: 1px 0 1px 9px; border-left: 2px solid var(--accent);
-  color: var(--ink); font-size: 13px;
-}
+/* editing fixes (unlocked from "Edit menu" in the footer) */
 .foot .endline { display: contents; }
 .editbtn { padding: 0; color: var(--muted); font-size: inherit; }
 .editbtn:hover { color: var(--ink); }
@@ -423,7 +419,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* desktop cards are narrow: the dish on one line, section and Add under it */
 .addrow input { flex: 1 0 100%; width: 0; }
 .addrow select { flex: 1 1 0; }
-.editbox .note { width: 100%; }
 .editbox input, .editbox select, .homedlg .pw {
   min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel);
   border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; outline: none;
