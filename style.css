@@ -402,7 +402,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .foot .endline { display: contents; }
 .editbtn { padding: 0; color: var(--muted); font-size: inherit; }
 .editbtn:hover { color: var(--ink); }
-.editing .share, .editing .cardfoot:empty { display: none; }
+.editing .share, .editing .cardfoot { display: none; }
 .editing .day.past { opacity: 1; }
 .grp li .x {
   flex: none; margin: -2px -4px -2px auto; width: 22px; height: 22px; border-radius: 6px;
@@ -410,16 +410,25 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .grp li .x:hover { color: var(--accent); background: var(--accent-soft); }
 .grp li.removed span { color: var(--faint); text-decoration: line-through; }
-.editbox { display: grid; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
-.addrow { display: flex; gap: 6px; margin: 0; }
+.editbox {
+  display: grid; gap: 6px; margin: 8px 0 4px; padding: 8px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+}
+.addrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.addrow .add {
+  flex: none; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  background: var(--ink); color: var(--bg);
+}
 .editbox > * { min-width: 0; }
-.addrow input { flex: 1 1 0; width: 0; }
+/* desktop cards are narrow: the dish on one line, section and Add under it */
+.addrow input { flex: 1 0 100%; width: 0; }
+.addrow select { flex: 1 1 0; }
 .editbox .note { width: 100%; }
 .editbox input, .editbox select, .homedlg .pw {
-  min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+  min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel);
   border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; outline: none;
 }
-.editbox select { flex: none; width: auto; padding-right: 4px; color: var(--muted); }
+.editbox select { padding-right: 4px; color: var(--muted); }
 .editbox input:focus, .homedlg .pw:focus { border-color: var(--muted); }
 .homedlg .pw { display: block; width: 100%; padding: 9px 12px; font-size: 16px; }
 .homedlg .err { margin: 8px 0 0; color: var(--accent); font-size: 13px; }
@@ -444,8 +453,33 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .editbar .ghost:hover { opacity: 1; }
 body.editing { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
 @media (max-width: 860px) {
-  .editbox input, .editbox select { font-size: 16px; padding: 7px 10px; }
-  .grp li .x { width: 30px; height: 26px; font-size: 18px; }
+  /* phones: thumb-sized controls, and a full-width save bar */
+  .editbox { margin: 10px 0 6px; padding: 10px; gap: 8px; background: var(--panel); border-radius: 12px; }
+  .editbox input, .editbox select { font-size: 16px; padding: 9px 11px; border-radius: 10px; background: var(--bg); }
+  .addrow .add { padding: 0 16px; border-radius: 10px; font-size: 15px; }
+  .addrow { flex-wrap: nowrap; }
+  .addrow input { flex: 1 1 0; }
+  .addrow select { flex: none; width: 104px; padding-right: 6px; }
+  .grp li .x {
+    width: 40px; height: 34px; margin: -6px -10px -6px auto; border-radius: 10px;
+    font-size: 20px; color: var(--muted);
+  }
+  .grp li .x:active { background: var(--accent-soft); color: var(--accent); }
+  .grp li.removed .x { color: var(--accent); }
+  .editbar {
+    left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom)); transform: none; max-width: none;
+    padding: 6px 6px 6px 18px; border-radius: 16px; font-size: 15px;
+  }
+  .editbar span { flex: 1; }
+  .editbar button { padding: 10px 18px; border-radius: 11px; font-size: 15px; }
+  body.editing { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* days with unsaved edits get a dot */
+  .daytab { position: relative; }
+  .daytab.edited::after {
+    content: ""; position: absolute; top: 4px; right: calc(50% - 15px);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
   .foot .endline { display: flex; flex-basis: 100%; justify-content: space-between; align-items: baseline; }
   .foot .endline .credit { flex-basis: auto; }
   .foot .editbtn { font-size: 12px; color: var(--faint); }

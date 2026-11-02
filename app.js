@@ -357,6 +357,8 @@
     }
     if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
     if (meal.note && !edit) card.append(el("p", "fixnote", meal.note));
+    // while editing, the day's add-a-dish and note sit at the top, in reach
+    if (edit) card.append(editBox(fk));
 
     // Brain Break is one small nightly spread: list all of it, plus the
     // self-serve basics that are out every night.
@@ -368,7 +370,6 @@
       meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false }, fk)));
       sec.append(ul);
       card.append(sec, el("p", "basics", "Plus cereal, bagels and bread, fruit, and drinks"));
-      if (edit) card.append(editBox(fk));
       addShare(card, d, meal, meal.categories.flatMap((c) => c.items).map((it) => it.name).slice(0, 6));
       return card;
     }
@@ -431,7 +432,6 @@
       sec.append(ul);
       card.append(sec);
     }
-    if (edit) card.append(editBox(fk));
     addShare(card, d, meal, buckets.get("Mains").map((it) => it.name).slice(0, 6));
     return card;
   }
@@ -491,11 +491,14 @@
       });
     }
 
-    // phone day strip, with the week arrows at either end
+    // phone day strip, with the week arrows at either end (and a dot on days
+    // with unsaved edits)
+    const edited = new Set(edit ? changed().map(([k]) => k) : []);
     const pa = el("button", "icon", "‹"); pa.disabled = first; pa.setAttribute("aria-label", "Previous week"); pa.onclick = () => goWeek(state.week - 1);
     const na = el("button", "icon", "›"); na.disabled = last; na.setAttribute("aria-label", "Next week"); na.onclick = () => goWeek(state.week + 1);
     tabs.replaceChildren(pa, ...w.days.map((d, i) => {
-      const b = el("button", "daytab" + (i === state.day ? " on" : "") + (d.date === today ? " today" : ""));
+      const b = el("button", "daytab" + (i === state.day ? " on" : "") + (d.date === today ? " today" : "")
+        + (edited.has(fixKey(d.date, (mealFor(d) || { name: state.meal }).name)) ? " edited" : ""));
       b.setAttribute("role", "tab");
       b.append(el("span", null, d.weekday.slice(0, 3)), el("b", null, String(parse(d.date).getDate())));
       b.onclick = () => goTo(state.week, i);
@@ -897,7 +900,9 @@
     const grp = el("select");
     grp.setAttribute("aria-label", "Section");
     for (const [g, label] of FIX_GROUPS) grp.append(new Option(label, g, false, g === edit.group));
-    row.append(name, grp);
+    name.enterKeyHint = "done";
+    const add = el("button", "add", "Add");
+    row.append(name, grp, add);
     row.onsubmit = (e) => {
       e.preventDefault();
       const n = name.value.trim();
@@ -911,7 +916,9 @@
     note.maxLength = 200;
     note.setAttribute("aria-label", "Note for this meal");
     note.value = (fixFor(fk) || {}).note || "";
+    note.enterKeyHint = "done";
     note.oninput = () => change(fk, (f) => { f.note = note.value; }, false);
+    note.onkeydown = (e) => { if (e.key === "Enter") note.blur(); };
     box.append(row, note);
     return box;
   }
@@ -921,7 +928,7 @@
   function updateBar() {
     if (!edit) return;
     const n = changed().length;
-    editMsg.textContent = n ? `${n} ${n === 1 ? "meal" : "meals"} changed` : "Editing";
+    editMsg.textContent = n ? `${n} ${n === 1 ? "meal" : "meals"} changed` : "Tap × to remove a dish";
     editDiscard.hidden = !n;
     editSave.hidden = false;
     editSave.textContent = n ? "Save" : "Done";
