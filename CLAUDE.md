@@ -6,4 +6,5 @@
   https://bergmenu.com (GitHub Pages), so no separate deploy step is needed.
 - Before pushing, `git pull --rebase`: the menu-bot commits `data/*.json` daily.
   If a `data/*.json` file conflicts, don't hand-merge it; re-run `python3 scrape.py`
-  and `git add` the result.
+  and `git add` the result. `data/fixes.json` isn't scraped (editors' fixes):
+  if it conflicts, keep both sides' keys.

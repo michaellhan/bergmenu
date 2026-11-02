@@ -3,7 +3,8 @@
   const $ = (s) => document.querySelector(s);
   const grid = $("#grid"), tabs = $("#daytabs"), range = $("#range");
   const prev = $("#prev"), next = $("#next"), allBox = $("#all"), q = $("#q");
-  const state = { data: null, hall: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
+  // raw: the hall's menu as scraped; data: with the fixes applied
+  const state = { raw: null, data: null, hall: null, week: 0, day: 0, meal: "Lunch", open: new Set(), q: "" };
 
   // Collapse HUDS's many stations into a few groups, by station. Mains
   // (unlabelled, at the top), soup and dessert always show; sides sit behind
@@ -239,9 +240,21 @@
     return e;
   }
 
-  function itemLi(it) {
-    const li = el("li", it.staple ? "staple" : "");
+  // `fk` (a fix key) gives the dish a remove / put-back button while editing
+  function itemLi(it, fk) {
+    const li = el("li", (it.staple ? "staple" : "") + (it.removed ? " removed" : ""));
     li.append(el("span", null, it.name));
+    if (edit && fk) {
+      const b = el("button", "x", it.removed ? "↺" : "×");
+      b.title = it.removed ? "Put back" : "Remove";
+      b.setAttribute("aria-label", `${b.title} ${it.name}`);
+      b.onclick = () => change(fk, (f) => {
+        if (it.removed) f.remove = f.remove.filter((n) => n !== it.name);
+        else if (it.added) f.add = f.add.filter((a) => a.name !== it.name);
+        else f.remove.push(it.name);
+      });
+      li.append(b);
+    }
     return li;
   }
 
@@ -333,14 +346,17 @@
     if (state.q) return renderSearchDay(d, today);
     const card = dayCard(d, today);
     const meal = mealFor(d);
+    const fk = fixKey(d.date, meal ? meal.name : state.meal);
     if (!meal) {
       // the grad cafés open weekdays only
       const wknd = state.hall.group === "Grad schools" && /^S/.test(d.weekday);
       const none = !d.meals.length ? (wknd ? "Closed weekends" : "No menu posted") : state.meal === "Brain Break" ? "No Brain Break tonight" : "Not served";
       card.append(el("p", "none", none));
+      if (edit) card.append(editBox(fk));
       return card;
     }
     if (meal.name === "Brunch") card.append(el("p", "mealnote", "Brunch"));
+    if (meal.note && !edit) card.append(el("p", "fixnote", meal.note));
 
     // Brain Break is one small nightly spread: list all of it, plus the
     // self-serve basics that are out every night.
@@ -349,9 +365,10 @@
       if (bb) card.append(el("p", "mealnote", span(bb[1], bb[2], bb[5])));
       const sec = el("div", "grp");
       const ul = el("ul");
-      meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false })));
+      meal.categories.flatMap((c) => c.items).forEach((it) => ul.append(itemLi({ ...it, staple: false }, fk)));
       sec.append(ul);
       card.append(sec, el("p", "basics", "Plus cereal, bagels and bread, fruit, and drinks"));
+      if (edit) card.append(editBox(fk));
       addShare(card, d, meal, meal.categories.flatMap((c) => c.items).map((it) => it.name).slice(0, 6));
       return card;
     }
@@ -364,15 +381,16 @@
         if (seen.has(it.name)) continue;
         seen.add(it.name);
         if (c.staple || it.staple) { staples.push(it); continue; }
-        // the pasta bar's shape and sauce make one dish
-        if (c.name.toLowerCase() === PASTA) { pasta.push(it.name); continue; }
-        const g = groupOf(c.name, it.name);
+        // the pasta bar's shape and sauce make one dish (listed apart while
+        // editing, so each can be removed)
+        if (c.name.toLowerCase() === PASTA && !edit) { pasta.push(it.name); continue; }
+        const g = it.group || groupOf(c.name, it.name);
         (g ? buckets.get(g) : addons).push(it);
       }
     }
     if (pasta.length) buckets.get("Sides").push({ name: "Pasta bar: " + pasta.join(", "), tags: [] });
     const key = d.date + "|" + meal.name;
-    const open = state.open.has(key);
+    const open = state.open.has(key) || !!edit;
     const hidden = [...buckets].filter(([g, v]) => !DEFAULT_OPEN.has(g) && v.length);
     const dishCount = hidden.reduce((n, [, v]) => n + v.length, 0);
     const extraCount = dishCount + addons.length;
@@ -384,16 +402,23 @@
       const sec = el("div", "grp");
       if (g !== "Mains") sec.append(el("h4", null, g));
       const ul = el("ul");
-      items.forEach((it) => ul.append(itemLi(it)));
+      items.forEach((it) => ul.append(itemLi(it, fk)));
       sec.append(ul);
       card.append(sec);
       any = true;
     }
-    if (open && addons.length) {
+    if (edit && addons.length) {
+      const sec = el("div", "grp");
+      sec.append(el("h4", null, "With"));
+      const ul = el("ul");
+      addons.forEach((it) => ul.append(itemLi(it, fk)));
+      sec.append(ul);
+      card.append(sec);
+    } else if (open && addons.length) {
       card.append(el("p", "with", "With " + addons.map((it) => it.name).join(", ")));
     }
     if (!any && !extraCount) card.append(el("p", "none", "Nothing new"));
-    if (extraCount) {
+    if (extraCount && !edit) {
       const b = el("button", "more", open ? "Less" : dishCount ? `+ ${dishCount} more` : "+ extras");
       b.onclick = () => { open ? state.open.delete(key) : state.open.add(key); render(); };
       card.append(b);
@@ -402,10 +427,11 @@
       const sec = el("div", "grp staples");
       sec.append(el("h4", null, "Every day"));
       const ul = el("ul");
-      staples.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it)));
+      staples.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it, fk)));
       sec.append(ul);
       card.append(sec);
     }
+    if (edit) card.append(editBox(fk));
     addShare(card, d, meal, buckets.get("Mains").map((it) => it.name).slice(0, 6));
     return card;
   }
@@ -575,7 +601,7 @@
     state.open.clear();
     if (sameFile && state.data) { keepView(v); render(); return; }
     carry = v;
-    state.data = null;
+    state.data = state.raw = null;
     grid.replaceChildren(el("p", "loading", "Loading menu…"));
     load();
   }
@@ -647,7 +673,7 @@
   document.addEventListener("touchstart", (e) => {
     if (sw) { release(true); return; } // a second finger: hand over to pinch zoom
     if (settling || e.touches.length > 1 || !phone.matches || state.q || !state.data) return;
-    if (e.target.closest("input, .top, .daytabs, dialog")) return;
+    if (e.target.closest("input, select, .top, .daytabs, dialog")) return;
     const t = e.touches[0];
     sw = {
       x: t.clientX, y: t.clientY, lx: t.clientX, lt: e.timeStamp, vx: 0, dx: 0,
@@ -791,17 +817,229 @@
     if (p.get("q")) { q.value = p.get("q"); state.q = q.value.trim().toLowerCase(); }
   }
 
+  // Fixes. Editors (anyone with the password) correct what HUDS got wrong:
+  // drop a dish, add one, or leave a note on a meal. Fixes live in
+  // data/fixes.json, keyed "<file>|<date>|<meal>", and are laid over the
+  // scraped menu here, so the daily re-scrape doesn't undo them. Saving files a
+  // "Menu fix" issue, which the GitHub Action applies and deploys
+  // (scripts/apply_fixes.py); until then the editor's device keeps it as pending.
+  // The password unlocks editor.json: a GitHub token that can only file issues
+  // (scripts/editor-password.mjs makes it).
+  const FIX_GROUPS = [["Mains", "Main"], ["Sides", "Side"], ["Soup", "Soup"], ["Dessert", "Dessert"],
+    ["Pizza & sandwiches", "Pizza"], ["Breakfast", "Breakfast"]];
+  let fixes = { updated: "", fixes: {} }, pending = [], edit = null;
+  const fixKey = (iso, meal) => `${state.hall.file}|${iso}|${meal}`;
+  const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+  const stored = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } };
+  const savedFix = (fk) => {
+    let f = fixes.fixes[fk];
+    for (const p of pending) if (fk in p.fixes) f = p.fixes[fk];
+    return f || null;
+  };
+  const fixFor = (fk) => (edit && edit.draft.has(fk) ? edit.draft.get(fk) : savedFix(fk));
+  // a fix as it's saved: no empty parts, null when there's nothing left
+  const tidy = (f) => {
+    if (!f) return null;
+    const o = {};
+    if (f.remove && f.remove.length) o.remove = [...new Set(f.remove)].sort();
+    if (f.add && f.add.length) o.add = f.add;
+    if (f.note && f.note.trim()) o.note = f.note.trim();
+    return Object.keys(o).length ? o : null;
+  };
+  const changed = () => [...edit.draft].filter(([k, f]) => JSON.stringify(tidy(f)) !== JSON.stringify(tidy(savedFix(k))));
+
+  // the menu with fixes applied; while editing, removed dishes stay (struck out)
+  function applyFixes(raw) {
+    const data = structuredClone(raw);
+    for (const w of data.weeks) for (const d of w.days) {
+      // a meal HUDS didn't post, given dishes or a note
+      for (const name of MEALS) {
+        const f = fixFor(fixKey(d.date, name));
+        if (f && !d.meals.some((m) => m.name === name) && ((f.add && f.add.length) || f.note)) d.meals.push({ name, categories: [] });
+      }
+      for (const m of d.meals) {
+        const f = fixFor(fixKey(d.date, m.name));
+        if (!f) continue;
+        const rm = new Set(f.remove);
+        for (const c of m.categories) {
+          c.items = edit ? c.items.map((it) => (rm.has(it.name) ? { ...it, removed: true } : it)) : c.items.filter((it) => !rm.has(it.name));
+        }
+        if (f.add && f.add.length) m.categories.push({ name: "Added", staple: false, items: f.add.map((a) => ({ name: a.name, tags: [], staple: false, group: a.group, added: true })) });
+        if (f.note) m.note = f.note;
+      }
+    }
+    return data;
+  }
+  const refresh = () => { if (state.raw) { state.data = applyFixes(state.raw); render(); } updateBar(); };
+
+  const loadFixes = () => fetch("data/fixes.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+    .then((f) => {
+      if (f && f.fixes) fixes = f;
+      // pending saves the site has caught up with (or that never made it)
+      const since = Date.parse(fixes.updated) || 0;
+      pending = (stored("berg.pending") || []).filter((p) => p.at > since && Date.now() - p.at < 60 * 60e3);
+      store("berg.pending", pending.length ? pending : null);
+    });
+
+  // an edit to one meal's fix, from what's in force now
+  function change(fk, fn, rerender = true) {
+    const cur = fixFor(fk) || {};
+    const f = { remove: [...(cur.remove || [])], add: [...(cur.add || [])], note: cur.note || "" };
+    fn(f);
+    edit.draft.set(fk, f);
+    rerender ? refresh() : updateBar();
+  }
+  // under each card while editing: add a dish, and the meal's note
+  function editBox(fk) {
+    const box = el("div", "editbox");
+    box.dataset.fk = fk;
+    const row = el("form", "addrow");
+    const name = el("input");
+    name.placeholder = "Add a dish";
+    name.maxLength = 120;
+    name.setAttribute("aria-label", "Add a dish");
+    const grp = el("select");
+    grp.setAttribute("aria-label", "Section");
+    for (const [g, label] of FIX_GROUPS) grp.append(new Option(label, g, false, g === edit.group));
+    row.append(name, grp);
+    row.onsubmit = (e) => {
+      e.preventDefault();
+      const n = name.value.trim();
+      if (!n) return;
+      edit.group = grp.value;
+      edit.refocus = fk;
+      change(fk, (f) => { f.add = f.add.filter((a) => a.name !== n); f.add.push({ name: n, group: grp.value }); f.remove = f.remove.filter((r) => r !== n); });
+    };
+    const note = el("input", "note");
+    note.placeholder = "Note, e.g. Closed for Thanksgiving";
+    note.maxLength = 200;
+    note.setAttribute("aria-label", "Note for this meal");
+    note.value = (fixFor(fk) || {}).note || "";
+    note.oninput = () => change(fk, (f) => { f.note = note.value; }, false);
+    box.append(row, note);
+    return box;
+  }
+
+  const editBar = $("#editBar"), editMsg = $("#editMsg"), editSave = $("#editSave"), editDiscard = $("#editDiscard");
+  let barTimer;
+  function updateBar() {
+    if (!edit) return;
+    const n = changed().length;
+    editMsg.textContent = n ? `${n} ${n === 1 ? "meal" : "meals"} changed` : "Editing";
+    editDiscard.hidden = !n;
+    editSave.hidden = false;
+    editSave.textContent = n ? "Save" : "Done";
+    // after "Add", stay in that card's box to add the next dish
+    if (edit.refocus) {
+      const box = grid.querySelector(`.editbox[data-fk="${CSS.escape(edit.refocus)}"]`);
+      edit.refocus = null;
+      if (box) box.querySelector("input").focus();
+    }
+  }
+  function startEdit() {
+    clearTimeout(barTimer);
+    edit = { draft: new Map(), group: "Mains", refocus: null };
+    document.body.classList.add("editing");
+    editBar.hidden = false;
+    refresh();
+  }
+  function stopEdit(msg) {
+    edit = null;
+    document.body.classList.remove("editing");
+    refresh();
+    editBar.hidden = !msg;
+    if (!msg) return;
+    editMsg.textContent = msg;
+    editSave.hidden = editDiscard.hidden = true;
+    barTimer = setTimeout(() => { editBar.hidden = true; }, 5000);
+  }
+  editDiscard.onclick = () => stopEdit();
+  editSave.onclick = async () => {
+    const ch = changed();
+    if (!ch.length) return stopEdit();
+    const cred = stored("berg.editor");
+    const sent = Object.fromEntries(ch.map(([k, f]) => [k, tidy(f)]));
+    const lines = ch.map(([k]) => {
+      const [file, iso, meal] = k.split("|");
+      const where = HALLS.filter((h) => h.file === file).map((h) => h.name).join(" & ");
+      return `${where}, ${fmt(iso, { weekday: "short", month: "short", day: "numeric" })} ${meal}`;
+    });
+    editSave.disabled = true;
+    editMsg.textContent = "Saving…";
+    try {
+      if (!cred) throw new Error("unlock again");
+      const r = await fetch(`https://api.github.com/repos/${cred.repo}/issues`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cred.token}`, Accept: "application/vnd.github+json" },
+        body: JSON.stringify({
+          title: `Menu fix: ${lines[0]}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ""}`,
+          body: `Saved on ${location.host}.\n\n${lines.map((l) => "- " + l).join("\n")}\n\n\`\`\`json\n${JSON.stringify(sent, null, 1)}\n\`\`\``,
+        }),
+      });
+      if (r.status === 401 || r.status === 403 || r.status === 404) { store("berg.editor", null); throw new Error("the password has changed, unlock again"); }
+      if (!r.ok) throw new Error(r.status);
+    } catch (e) {
+      editMsg.textContent = `Couldn't save (${e.message})`;
+      editSave.disabled = false;
+      return;
+    }
+    editSave.disabled = false;
+    pending.push({ at: Date.now(), fixes: sent });
+    store("berg.pending", pending);
+    stopEdit("Saved. It's live for everyone in a few minutes.");
+  };
+
+  // unlocking: the password decrypts editor.json's token, kept on this device
+  const editDlg = $("#editDlg"), editPw = $("#editPw"), editErr = $("#editErr");
+  async function unlock(pw) {
+    const r = await fetch("editor.json", { cache: "no-cache" }).catch(() => null);
+    if (!r || !r.ok) throw new Error("Editing isn't set up yet.");
+    const e = await r.json();
+    const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: bytes(e.salt), iterations: e.iter, hash: "SHA-256" },
+      base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    try {
+      return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(e.iv) }, key, bytes(e.data))));
+    } catch (_) { throw new Error("Wrong password"); }
+  }
+  $("#editBtn").onclick = () => {
+    if (edit) return;
+    if (stored("berg.editor")) return startEdit();
+    editErr.hidden = true;
+    editPw.value = "";
+    editDlg.showModal();
+  };
+  $("#editCancel").onclick = () => editDlg.close();
+  $("#editForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const b = e.target.querySelector(".install");
+    b.disabled = true;
+    try {
+      store("berg.editor", await unlock(editPw.value));
+      editDlg.close();
+      startEdit();
+    } catch (err) {
+      editErr.textContent = err.message;
+      editErr.hidden = false;
+      editPw.select();
+    }
+    b.disabled = false;
+  };
+
   let firstLoad = true;
   function load() {
     const hall = state.hall;
-    return fetch(`data/${hall.file}.json`, { cache: "no-cache" })
-      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((data) => {
+    return Promise.all([fetch(`data/${hall.file}.json`, { cache: "no-cache" })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }), loadFixes()])
+      .then(([data]) => {
         if (hall.file !== state.hall.file) return; // switched hall meanwhile
         const old = state.data;
         const wasDefault = old && viewKey() === auto;
         const viewing = old && old.weeks[state.week].days[state.day].date;
-        state.data = data;
+        state.raw = data;
+        state.data = applyFixes(data);
         loadedAt = Date.now();
         if (!old && firstLoad) initialView();
         else if (!old) { keepView(carry); carry = null; }

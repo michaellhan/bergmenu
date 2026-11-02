@@ -393,3 +393,60 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .share.bar.copied { color: var(--accent); border-color: var(--accent); }
   .searching .share.bar { display: none; }
 }
+
+/* fixes: a meal's note, and editing (unlocked from "Edit menu" in the footer) */
+.fixnote {
+  margin: 8px 0 4px; padding: 1px 0 1px 9px; border-left: 2px solid var(--accent);
+  color: var(--ink); font-size: 13px;
+}
+.foot .endline { display: contents; }
+.editbtn { padding: 0; color: var(--muted); font-size: inherit; }
+.editbtn:hover { color: var(--ink); }
+.editing .share, .editing .cardfoot:empty { display: none; }
+.editing .day.past { opacity: 1; }
+.grp li .x {
+  flex: none; margin: -2px -4px -2px auto; width: 22px; height: 22px; border-radius: 6px;
+  font-size: 15px; line-height: 1; color: var(--faint);
+}
+.grp li .x:hover { color: var(--accent); background: var(--accent-soft); }
+.grp li.removed span { color: var(--faint); text-decoration: line-through; }
+.editbox { display: grid; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.addrow { display: flex; gap: 6px; margin: 0; }
+.editbox > * { min-width: 0; }
+.addrow input { flex: 1 1 0; width: 0; }
+.editbox .note { width: 100%; }
+.editbox input, .editbox select, .homedlg .pw {
+  min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; outline: none;
+}
+.editbox select { flex: none; width: auto; padding-right: 4px; color: var(--muted); }
+.editbox input:focus, .homedlg .pw:focus { border-color: var(--muted); }
+.homedlg .pw { display: block; width: 100%; padding: 9px 12px; font-size: 16px; }
+.homedlg .err { margin: 8px 0 0; color: var(--accent); font-size: 13px; }
+.homedlg .err[hidden] { display: none; }
+.homedlg form .install { margin: 14px 0 0; }
+.homedlg form .done { margin-top: 8px; }
+.homedlg .install:disabled { opacity: 0.6; }
+.editbar {
+  position: fixed; z-index: 30; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); max-width: calc(100vw - 32px);
+  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px;
+  background: var(--ink); color: var(--bg); border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22); font-size: 13px; white-space: nowrap;
+}
+.editbar[hidden] { display: none; }
+.editbar span { margin-right: 8px; overflow: hidden; text-overflow: ellipsis; }
+.editbar button { padding: 6px 14px; border-radius: 999px; font-weight: 500; }
+.editbar button[hidden] { display: none; }
+.editbar .primary { background: var(--bg); color: var(--ink); }
+.editbar .primary:disabled { opacity: 0.6; }
+.editbar .ghost { opacity: 0.7; }
+.editbar .ghost:hover { opacity: 1; }
+body.editing { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+@media (max-width: 860px) {
+  .editbox input, .editbox select { font-size: 16px; padding: 7px 10px; }
+  .grp li .x { width: 30px; height: 26px; font-size: 18px; }
+  .foot .endline { display: flex; flex-basis: 100%; justify-content: space-between; align-items: baseline; }
+  .foot .endline .credit { flex-basis: auto; }
+  .foot .editbtn { font-size: 12px; color: var(--faint); }
+}

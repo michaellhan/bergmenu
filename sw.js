@@ -55,7 +55,8 @@ addEventListener("fetch", (e) => {
   if (url.origin === location.origin) {
     // every page URL (?d=…&m=…) is the same index.html
     if (req.mode === "navigate") return e.respondWith(networkFirst(e, registration.scope));
-    if (VERSION === "dev" || url.pathname.includes("/data/")) return e.respondWith(networkFirst(e, req));
+    // the menu, its fixes, and the editor password (editor.json) change between releases
+    if (VERSION === "dev" || url.pathname.includes("/data/") || url.pathname.endsWith("/editor.json")) return e.respondWith(networkFirst(e, req));
     return e.respondWith(cacheFirst(e));
   }
   if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") e.respondWith(cacheFirst(e));

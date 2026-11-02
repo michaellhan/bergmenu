@@ -33,6 +33,28 @@ Links: `?d=2026-10-02&m=Dinner` opens a day and meal, `?q=tacos` a search. The
 address bar follows along as you browse, and each day has a share button.
 Keys: ←/→ change day (week on desktop), `/` searches, 1–4 pick a meal.
 
+## Fixing the menu
+
+When HUDS's menu is wrong, **Edit menu** in the footer unlocks an editor (the
+password, once per device): remove a dish (×), add one, or leave a note on a meal.
+**Save** files a "Menu fix" issue on this repo; the Action applies it to
+`data/fixes.json` (`scripts/apply_fixes.py`), closes the issue and deploys, so it's
+live for everyone in a few minutes (the editor sees it right away). Fixes are laid
+over the scraped menu in `app.js`, so the daily re-scrape doesn't undo them, and
+each is keyed by kitchen, day and meal; a meal's fixes drop off three weeks after.
+
+The password unlocks `editor.json`, a GitHub token encrypted with it. To set or
+change it, make a fine-grained token at
+https://github.com/settings/personal-access-tokens/new limited to this repo with
+only **Issues: Read and write**, then:
+
+```bash
+node scripts/editor-password.mjs
+```
+
+and commit `editor.json`. Since the token can only file issues, a guessed password
+can't touch the site's code, only file fixes, which the script checks first.
+
 ## Hours
 
 Meal times live in `HOURS` in `app.js`, which also builds the hours popover.
