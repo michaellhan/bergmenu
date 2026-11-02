@@ -912,7 +912,8 @@
       change(fk, (f) => { f.add = f.add.filter((a) => a.name !== n); f.add.push({ name: n, group: grp.value }); f.remove = f.remove.filter((r) => r !== n); });
     };
     const note = el("input", "note");
-    note.placeholder = "Note, e.g. Closed for Thanksgiving";
+    note.placeholder = "Add a note";
+    note.title = "A note on this meal for everyone, e.g. Closed for Thanksgiving";
     note.maxLength = 200;
     note.setAttribute("aria-label", "Note for this meal");
     note.value = (fixFor(fk) || {}).note || "";
