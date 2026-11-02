@@ -818,24 +818,23 @@
   }
 
   // Fixes. Editors (anyone with the password) correct what HUDS got wrong:
-  // drop a dish, add one, or leave a note on a meal. Fixes live in
-  // data/fixes.json, keyed "<file>|<date>|<meal>", and are laid over the
-  // scraped menu here, so the daily re-scrape doesn't undo them. Saving files a
-  // "Menu fix" issue, which the GitHub Action applies and deploys
-  // (scripts/apply_fixes.py); until then the editor's device keeps it as pending.
-  // The password unlocks editor.json: a GitHub token that can only file issues
-  // (scripts/editor-password.mjs makes it).
+  // drop a dish, add one, or leave a note on a meal. Fixes are kept by a small
+  // Cloudflare Worker (worker/), keyed "<file>|<date>|<meal>", and laid over
+  // the scraped menu here, so the daily re-scrape doesn't undo them. The Worker
+  // checks the password, so saving is live for everyone at once.
+  const FIXES_API = "https://bergmenu-fixes.combatrobotics.workers.dev";
   const FIX_GROUPS = [["Mains", "Main"], ["Sides", "Side"], ["Soup", "Soup"], ["Dessert", "Dessert"],
     ["Pizza & sandwiches", "Pizza"], ["Breakfast", "Breakfast"]];
-  let fixes = { updated: "", fixes: {} }, pending = [], edit = null;
+  let fixes = { updated: "", fixes: {} }, edit = null;
   const fixKey = (iso, meal) => `${state.hall.file}|${iso}|${meal}`;
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   const stored = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } };
-  const savedFix = (fk) => {
-    let f = fixes.fixes[fk];
-    for (const p of pending) if (fk in p.fixes) f = p.fixes[fk];
-    return f || null;
-  };
+  const savedFix = (fk) => fixes.fixes[fk] || null;
+  // the password, kept on an editor's device once it's unlocked
+  const password = () => { const p = stored("berg.editor"); return typeof p === "string" ? p : null; };
+  const api = (path, body) => fetch(FIXES_API + path, body ? {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  } : { cache: "no-store" });
   const fixFor = (fk) => (edit && edit.draft.has(fk) ? edit.draft.get(fk) : savedFix(fk));
   // a fix as it's saved: no empty parts, null when there's nothing left
   const tidy = (f) => {
@@ -872,15 +871,11 @@
   }
   const refresh = () => { if (state.raw) { state.data = applyFixes(state.raw); render(); } updateBar(); };
 
-  const loadFixes = () => fetch("data/fixes.json", { cache: "no-cache" })
-    .then((r) => (r.ok ? r.json() : null)).catch(() => null)
-    .then((f) => {
-      if (f && f.fixes) fixes = f;
-      // pending saves the site has caught up with (or that never made it)
-      const since = Date.parse(fixes.updated) || 0;
-      pending = (stored("berg.pending") || []).filter((p) => p.at > since && Date.now() - p.at < 60 * 60e3);
-      store("berg.pending", pending.length ? pending : null);
-    });
+  // the menu shows without fixes if the Worker is slow or down (or offline)
+  const loadFixes = () => Promise.race([
+    api("/fixes").then((r) => (r.ok ? r.json() : null)),
+    new Promise((r) => setTimeout(r, 3000)),
+  ]).catch(() => null).then((f) => { if (f && f.fixes) fixes = f; });
 
   // an edit to one meal's fix, from what's in force now
   function change(fk, fn, rerender = true) {
@@ -958,55 +953,35 @@
   editSave.onclick = async () => {
     const ch = changed();
     if (!ch.length) return stopEdit();
-    const cred = stored("berg.editor");
-    const sent = Object.fromEntries(ch.map(([k, f]) => [k, tidy(f)]));
-    const lines = ch.map(([k]) => {
-      const [file, iso, meal] = k.split("|");
-      const where = HALLS.filter((h) => h.file === file).map((h) => h.name).join(" & ");
-      return `${where}, ${fmt(iso, { weekday: "short", month: "short", day: "numeric" })} ${meal}`;
-    });
     editSave.disabled = true;
     editMsg.textContent = "Saving…";
     try {
-      if (!cred) throw new Error("unlock again");
-      const r = await fetch(`https://api.github.com/repos/${cred.repo}/issues`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cred.token}`, Accept: "application/vnd.github+json" },
-        body: JSON.stringify({
-          title: `Menu fix: ${lines[0]}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ""}`,
-          body: `Saved on ${location.host}.\n\n${lines.map((l) => "- " + l).join("\n")}\n\n\`\`\`json\n${JSON.stringify(sent, null, 1)}\n\`\`\``,
-        }),
-      });
-      if (r.status === 401 || r.status === 403 || r.status === 404) { store("berg.editor", null); throw new Error("the password has changed, unlock again"); }
-      if (!r.ok) throw new Error(r.status);
+      const r = await api("/fixes", { password: password(), fixes: Object.fromEntries(ch.map(([k, f]) => [k, tidy(f)])) });
+      const res = await r.json().catch(() => ({}));
+      if (r.status === 401) { store("berg.editor", null); throw new Error("the password has changed, unlock again"); }
+      if (!r.ok) throw new Error(res.error || r.status);
+      fixes = res;
     } catch (e) {
       editMsg.textContent = `Couldn't save (${e.message})`;
       editSave.disabled = false;
       return;
     }
     editSave.disabled = false;
-    pending.push({ at: Date.now(), fixes: sent });
-    store("berg.pending", pending);
-    stopEdit("Saved. It's live for everyone in a few minutes.");
+    stopEdit("Saved. It's live for everyone.");
   };
 
-  // unlocking: the password decrypts editor.json's token, kept on this device
+  // unlocking: the Worker checks the password
   const editDlg = $("#editDlg"), editPw = $("#editPw"), editErr = $("#editErr");
   async function unlock(pw) {
-    const r = await fetch("editor.json", { cache: "no-cache" }).catch(() => null);
-    if (!r || !r.ok) throw new Error("Editing isn't set up yet.");
-    const e = await r.json();
-    const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
-    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: bytes(e.salt), iterations: e.iter, hash: "SHA-256" },
-      base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-    try {
-      return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(e.iv) }, key, bytes(e.data))));
-    } catch (_) { throw new Error("Wrong password"); }
+    const r = await api("/unlock", { password: pw }).catch(() => null);
+    if (!r) throw new Error("Couldn't reach the server. Try again?");
+    if (r.status === 401) throw new Error("Wrong password");
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn't unlock (" + r.status + ")");
+    return pw;
   }
   $("#editBtn").onclick = () => {
     if (edit) return;
-    if (stored("berg.editor")) return startEdit();
+    if (password()) return startEdit();
     editErr.hidden = true;
     editPw.value = "";
     editDlg.showModal();

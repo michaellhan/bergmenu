@@ -1,0 +1,10 @@
+# The menu fixes API (see index.js), at https://bergmenu-fixes.combatrobotics.workers.dev.
+# From this folder: `npx wrangler deploy` to update it,
+# `npx wrangler secret put PASSWORD` to change the editor password.
+name = "bergmenu-fixes"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "FIXES"
+id = "0791cbc42e9d4a0eb4c13957036266ab"

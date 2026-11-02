@@ -37,23 +37,19 @@ Keys: ←/→ change day (week on desktop), `/` searches, 1–4 pick a meal.
 
 When HUDS's menu is wrong, **Edit menu** in the footer unlocks an editor (the
 password, once per device): remove a dish (×), add one, or leave a note on a meal.
-**Save** files a "Menu fix" issue on this repo; the Action applies it to
-`data/fixes.json` (`scripts/apply_fixes.py`), closes the issue and deploys, so it's
-live for everyone in a few minutes (the editor sees it right away). Fixes are laid
-over the scraped menu in `app.js`, so the daily re-scrape doesn't undo them, and
-each is keyed by kitchen, day and meal; a meal's fixes drop off three weeks after.
+**Save** is live for everyone straight away.
 
-The password unlocks `editor.json`, a GitHub token encrypted with it. To set or
-change it, make a fine-grained token at
-https://github.com/settings/personal-access-tokens/new limited to this repo with
-only **Issues: Read and write**, then:
+Fixes are kept by a small Cloudflare Worker (`worker/`), which checks the password
+and validates each fix, and are laid over the scraped menu in `app.js`, so the
+daily re-scrape doesn't undo them. Each is keyed by kitchen, day and meal, and
+drops off three weeks after. If the Worker is down the menu shows without fixes.
+
+To deploy the Worker or change the password (from `worker/`):
 
 ```bash
-node scripts/editor-password.mjs
+npx wrangler deploy
+npx wrangler secret put PASSWORD
 ```
-
-and commit `editor.json`. Since the token can only file issues, a guessed password
-can't touch the site's code, only file fixes, which the script checks first.
 
 ## Hours
 

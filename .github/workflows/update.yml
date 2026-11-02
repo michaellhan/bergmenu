@@ -8,9 +8,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-  # menu fixes saved on the site (scripts/apply_fixes.py)
-  issues:
-    types: [opened]
 
 permissions:
   contents: write
@@ -24,7 +21,6 @@ concurrency:
 
 jobs:
   update:
-    if: github.event_name != 'issues' || startsWith(github.event.issue.title, 'Menu fix')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -36,15 +32,6 @@ jobs:
           python-version: "3.12"
       - name: Scrape HUDS
         run: python3 scrape.py
-      # Every open fix, not just this run's: a run waiting on another one is
-      # cancelled when a newer one queues, and its fix would be left behind.
-      - name: Apply menu fixes from the site
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/issues?state=open&creator=$GITHUB_REPOSITORY_OWNER&per_page=100" > "$RUNNER_TEMP/issues.json"
-          python3 scripts/apply_fixes.py < "$RUNNER_TEMP/issues.json" > "$RUNNER_TEMP/applied.tsv"
-          cat "$RUNNER_TEMP/applied.tsv"
       - name: Commit updated data here
         run: |
           git config user.name "menu-bot"
@@ -52,19 +39,11 @@ jobs:
           git add data/
           git diff --cached --quiet || git commit -m "Update menu $(date -u +%F)"
           git push
-      - name: Close applied fixes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          while IFS=$'\t' read -r n msg; do
-            gh issue close "$n" -R "$GITHUB_REPOSITORY" --comment "$msg"
-          done < "$RUNNER_TEMP/applied.tsv"
       - name: Build site
         run: |
           mkdir -p _site/data
           cp index.html style.css app.js sw.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
           cp data/*.json _site/data/
-          if [ -f editor.json ]; then cp editor.json _site/; fi
           echo bergmenu.com > _site/CNAME
           # Cache-bust by content: style.css?v=dev -> ?v=<hash of style.css>,
           # and version the service worker's cache by the site's files.
