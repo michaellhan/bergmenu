@@ -96,6 +96,13 @@ An item is hidden by default if either:
 
 Tweak the list or the threshold in `scrape.py` if something is being hidden that shouldn't be.
 
+**Show everything** lists them under "Every day", split by kind (Eggs & protein,
+Waffles & oatmeal, Fruit, Grill, Salad bar and so on). Stations that are one kind of
+thing name the group; the rest go by item name, since a station can mean anything:
+at breakfast the Salad Bar is citrus and hummus. The rules live in
+`EVERYDAY_STATIONS`, `BREAKFAST_KINDS`, `SALAD_KINDS` and `everydayGroup` in `app.js`.
+Anything unmatched lands in "Sides" (or "Salad bar", if that's its station).
+
 ## What shows by default
 
 Grouping is by HUDS station. Entrées, soup and dessert always show. Vegetables,

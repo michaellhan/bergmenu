@@ -49,6 +49,53 @@
     return "Sides";
   };
 
+  // "Every day" is split by kind, in this order, so it reads as a few short
+  // lists rather than one A-Z run of everything out that meal. Stations that
+  // are one kind of thing name it. The rest go by name, because a station can
+  // mean anything: at breakfast the Salad Bar is citrus and hummus, and the
+  // Featured Special Bar is yogurt and cream cheese.
+  const EVERYDAY = ["Eggs & protein", "Egg toppings", "Waffles & oatmeal", "Bagels & muffins", "Yogurt & granola", "Fruit",
+    "Grill", "Deli", "Toppings", "Pizza & sandwiches", "Bowls", "Salad bar", "Grains & beans", "Salad toppings",
+    "Grab & go", "Gut health", "Bread", "Soft serve", "Sides"];
+  const EVERYDAY_STATIONS = {
+    "build your own": "Waffles & oatmeal", "bagel": "Bagels & muffins",
+    "fresh fruit": "Fruit", "salad selections": "Fruit",
+    "from the grill": "Grill", "sand/ deli": "Deli", "pizza": "Pizza & sandwiches", "paninis": "Pizza & sandwiches",
+    "craft bowls": "Bowls", "daily bowl": "Bowls", "station": "Bowls", "special bar": "Grab & go",
+    "brown rice station": "Grains & beans", "gut health station": "Gut health", "extras": "Gut health",
+    "bread choices": "Bread", "desserts": "Soft serve",
+  };
+  const PROTEIN = /\beggs?\b|tofu|sausage|bacon|\bham\b|chicken|turkey|tuna|salmon/i;
+  const FRUIT = /fruit|apple|banana|blueberr|strawberr|raspberr|orange|kiwi|melon|cantaloupe|pineapple|mango/i;
+  // what's on a burger or sandwich rather than the burger itself
+  const FIXINGS = /rolls$|^(cheddar|swiss) cheese|lettuce|^sliced (red onions|tomatoes)|sour cream|salsa|pesto|pickle|guacamole$/i;
+  // first match wins: preserves and cranberries before fruit, cream and
+  // cottage cheese before egg toppings
+  const BREAKFAST_KINDS = [
+    ["Eggs & protein", PROTEIN],
+    ["Waffles & oatmeal", /waffle|oatmeal|overnight oats|syrup/i],
+    ["Bagels & muffins", /bagel|muffin|cream cheese|preserves|sun butter|honey butter|hummus|avocado/i],
+    ["Yogurt & granola", /yogurt|cottage cheese|granola/i],
+    ["Fruit", FRUIT],
+    ["Egg toppings", /cheese|spinach|onions|tomatoes/i],
+    ["Soft serve", /soft serve|ice cream/i],
+  ];
+  const SALAD_KINDS = [
+    ["Eggs & protein", PROTEIN],
+    ["Salad toppings", /cheese|yogurt|cranberr|apple rings|seeds|wonton|sauce|vinaigrette|vinegar/i],
+    ["Grains & beans", /barley|farro|millet|quinoa|sorghum|tabouleh|beans|chick ?peas|hummus/i],
+    ["Fruit", FRUIT],
+  ];
+  const everydayGroup = (meal, cat, name) => {
+    const c = cat.toLowerCase();
+    const station = EVERYDAY_STATIONS[c];
+    if (station) return (station === "Grill" || station === "Deli") && FIXINGS.test(name) ? "Toppings" : station;
+    const salad = c === "salad bar";
+    const kinds = salad && meal !== "Breakfast" ? SALAD_KINDS : BREAKFAST_KINDS;
+    const kind = kinds.find(([, re]) => re.test(name));
+    return kind ? kind[0] : salad ? "Salad bar" : "Sides";
+  };
+
   const nowParts = () => {
     const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
     const g = (t) => p.find((x) => x.type === t).value;
@@ -380,7 +427,7 @@
       for (const it of c.items) {
         if (seen.has(it.name)) continue;
         seen.add(it.name);
-        if (c.staple || it.staple) { staples.push(it); continue; }
+        if (c.staple || it.staple) { staples.push({ ...it, kind: everydayGroup(meal.name, c.name, it.name) }); continue; }
         // the pasta bar's shape and sauce make one dish (listed apart while
         // editing, so each can be removed)
         if (c.name.toLowerCase() === PASTA && !edit) { pasta.push(it.name); continue; }
@@ -426,9 +473,14 @@
     if (allBox.checked && staples.length) {
       const sec = el("div", "grp staples");
       sec.append(el("h4", null, "Every day"));
-      const ul = el("ul");
-      staples.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it, fk)));
-      sec.append(ul);
+      for (const kind of EVERYDAY) {
+        const items = staples.filter((it) => it.kind === kind);
+        if (!items.length) continue;
+        sec.append(el("h5", null, kind));
+        const ul = el("ul");
+        items.sort((a, b) => a.name.localeCompare(b.name)).forEach((it) => ul.append(itemLi(it, fk)));
+        sec.append(ul);
+      }
       card.append(sec);
     }
     addShare(card, d, meal, buckets.get("Mains").map((it) => it.name).slice(0, 6));

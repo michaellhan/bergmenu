@@ -217,6 +217,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .hint { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
 .hint button { color: var(--accent); padding: 0; }
 .grp.staples li { color: var(--muted); }
+.grp.staples h5 { margin: 9px 0 1px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.grp.staples h4 + h5 { margin-top: 5px; }
 .more {
   display: block; margin: 8px 0 2px; padding: 0;
   font-size: 12px; color: var(--muted);
@@ -343,6 +345,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .grp { padding: 10px 0 4px; }
   .grp + .grp { padding-top: 16px; }
   .grp li { padding: 5px 0; }
+  .grp.staples h5 { margin-top: 14px; font-size: 14px; }
   .more { margin-top: 10px; font-size: 14px; }
 
   /* search: stack every matching day with its own heading */
