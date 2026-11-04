@@ -61,7 +61,7 @@
     "build your own": "Waffles & oatmeal", "bagel": "Bagels & muffins",
     "fresh fruit": "Fruit", "salad selections": "Fruit",
     "from the grill": "Grill", "sand/ deli": "Deli", "pizza": "Pizza & sandwiches", "paninis": "Pizza & sandwiches",
-    "craft bowls": "Bowls", "daily bowl": "Bowls", "station": "Bowls", "special bar": "Grab & go",
+    "craft bowls": "Bowls", "daily bowl": "Bowls", "station": "Bowls", "special bar": "Grab & go", "miscellaneous": "Grab & go",
     "brown rice station": "Grains & beans", "gut health station": "Gut health", "extras": "Gut health",
     "bread choices": "Bread", "desserts": "Soft serve",
   };

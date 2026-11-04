@@ -79,10 +79,15 @@ here. To publish by hand:
 scripts/deploy.sh
 ```
 
-## Duplicate names
+## Names
 
-`ALIASES` in `scrape.py` maps HUDS's alternate names for one dish to a single
-name. Items at the Halal station that match a regular dish once "Halal" is
+HUDS's recipe names have typos and shorthand, so `tidy` in `scrape.py` cleans them
+up: `WORD_FIXES` holds typos ("Currried"), wherever they turn up, and it also drops
+the "Fruit, " prefix and spells out "w/". `ALIASES` maps HUDS's alternate names for
+one dish to a single name, and fixes the odd garbled one-off. Saved menu fixes match
+dishes by name, so renaming a dish lets go of any fix still naming the old spelling.
+
+Items at the Halal station that match a regular dish once "Halal" is
 dropped from the name (e.g. "Halal Meatballs in Marinara Sauce") are folded
 into that dish and tagged halal.
 

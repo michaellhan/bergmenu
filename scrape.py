@@ -72,11 +72,38 @@ CAFE_STAPLE_CATEGORIES = {"craft bowls", "special bar", "misc", "miscellaneous"}
 MEAL_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner", "Brain Break", "All Day"]
 ACRONYMS = {"BBQ", "BLT", "HKS", "HLS", "GSD", "SEC", "GSAS", "AS", "V", "VG"}
 NAME_LIMIT = 60  # FoodPro's recipe-name field width
+# HUDS's typos and shorthand, fixed wherever they turn up (so a new dish with
+# the same typo is fixed too). Whole words or phrases, case-sensitive.
+WORD_FIXES = {
+    "Apriocot": "Apricot", "Artisnal": "Artisanal", "Bbq": "BBQ", "Brusselsprout": "Brussels Sprout",
+    "Bulgar": "Bulgur", "Bulger": "Bulgur", "Carmelized": "Caramelized", "Carribean": "Caribbean",
+    "CheeseBreakfast": "Cheese Breakfast", "Chefs": "Chef's", "Chice": "Chive", "Currried": "Curried",
+    "De Gallo": "de Gallo", "Eggpant": "Eggplant", "Godess": "Goddess", "Greenbeans": "Green Beans",
+    "Huds": "HUDS", "Lhamb": "Lamb", "Low fat": "Low Fat", "Mediteranean": "Mediterranean",
+    "Monteray": "Monterey", "Morrocan": "Moroccan", "PepperPaste": "Pepper Paste", "Piccatta": "Piccata",
+    "Potsticker's": "Potstickers", "Rost": "Roasted", "SLiced": "Sliced", "Saandwich": "Sandwich",
+    "Sausaqe": "Sausage", "Shwarma": "Shawarma", "Sigeumch": "Sigeumchi", "Soft serve": "Soft Serve",
+    "StirFry": "Stir Fry", "Stirfry": "Stir Fry", "SwissWheat": "Swiss on Wheat", "Veija": "Vieja",
+    "Vegetabls": "Vegetables", "Vianaigrette": "Vinaigrette", "Zaatar": "Za'atar",
+    "burger": "Burger", "dressing": "Dressing", "kimchi": "Kimchi", "power blend": "Power Blend", "sandwich": "Sandwich",
+}
+WORD_FIX = re.compile(r"\b(?:" + "|".join(map(re.escape, WORD_FIXES)) + r")\b")
 # HUDS sometimes lists the same dish under different names in one meal; map
-# each variant to one name so it shows once.
+# each variant to one name so it shows once. Also the one-off garbled names.
+# Keys are as they stand after the word fixes in tidy().
 ALIASES = {
     "Hard Cooked Eggs - Cage Free": "Cage Free Hard Boiled Eggs",
     "Hard Cooked Eggs": "Cage Free Hard Boiled Eggs",
+    "Breakfast Egg Sand with Bacon": "Breakfast Egg Sandwich with Bacon",
+    "Broth, Vegetarian Pho": "Vegetarian Pho Broth",
+    "Fasolakia Latheria (Greek style Green Bean )": "Fasolakia Latheria (Greek Style Green Beans)",
+    "Hood 1% Milk 8z": "Hood 1% Milk (8 oz)",
+    "Italian Lite Dressing (pc)": "Italian Lite Dressing",
+    "Milk Whole 8oz": "Whole Milk (8 oz)",
+    "Plant Based Chorizo Crumbles vegan": "Vegan Chorizo Crumbles",
+    "Roasted Veggies for 177048": "Roasted Veggies",
+    "Sauce for Buffalo": "Buffalo Sauce",
+    "Soup Veg Lge": "Large Vegetable Soup",
 }
 
 
@@ -100,6 +127,15 @@ def fetch(url: str, tries: int = 4) -> str:
 
 def clean(s: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(s).replace("\xa0", " ")).strip()
+
+
+def tidy(name: str) -> str:
+    """Fix a recipe name's typos and shorthand: 'Fruit, Bananas' -> 'Bananas'."""
+    name = WORD_FIX.sub(lambda m: WORD_FIXES[m[0]], name)
+    name = re.sub(r"\bw/\s*", "with ", name)
+    name = re.sub(r"(?<=\s)&(?=\S)", "& ", name)  # "Turkey &Swiss"
+    name = re.sub(r"^Fruit,\s*", "", name)
+    return ALIASES.get(name, name)
 
 
 def parse_day(page: str) -> list[dict]:
@@ -139,7 +175,7 @@ def parse_day(page: str) -> list[dict]:
                 name = name.rstrip(" &,/-") + "…"
             # some kitchens type parts of names in capitals ("STIR FRY LO MEIN")
             name = re.sub(r"\b[A-Z]{2,}\b", lambda w: w[0] if w[0] in ACRONYMS else w[0].capitalize(), name)
-            name = ALIASES.get(name, name)
+            name = tidy(name)
             if cur is None:
                 cur = "Other"
                 cats.setdefault(cur, [])
