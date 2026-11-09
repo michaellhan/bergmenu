@@ -20,10 +20,11 @@
   const GROUPS = [
     ["Mains", ["entrees", "veg,vegan", "halal", "brunch", "chili bar/stew",
                "breakfast entrees", "breakfast meats", "breakfast bakery", ...CAFE_MAINS]],
+    // sides go right under the mains they're served with, once opened
+    ["Sides", ["plant protein", "starch and potatoes", "vegetables", "delish"]],
     ["Soup", ["today's soup", "daily soups"]],
     ["Pizza & sandwiches", ["pizza", "paninis"]],
     ["Dessert", ["desserts", "miscellaneous"]],
-    ["Sides", ["plant protein", "starch and potatoes", "vegetables", "delish"]],
     ["Breakfast", ["breakfast"]],
   ];
   const DEFAULT_OPEN = new Set(["Mains", "Soup", "Pizza & sandwiches", "Dessert"]);
