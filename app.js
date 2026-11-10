@@ -354,7 +354,7 @@
     const [icon, bar] = shareButtons(d, meal, dishes);
     card.querySelector(".dayhead").append(icon);
     const row = el("div", "cardfoot");
-    const more = card.querySelector(":scope > .more");
+    const more = card.querySelector(":scope > .more:not(.sidesbtn)");
     if (more) more.replaceWith(row), row.append(more);
     else card.append(row);
     row.append(bar);
@@ -439,19 +439,34 @@
     if (pasta.length) buckets.get("Sides").push({ name: "Pasta bar: " + pasta.join(", "), tags: [] });
     const key = d.date + "|" + meal.name;
     const open = state.open.has(key) || !!edit;
-    const hidden = [...buckets].filter(([g, v]) => !DEFAULT_OPEN.has(g) && v.length);
+    // sides get their own toggle, right under the mains they go with
+    const sidesKey = key + "|sides";
+    const sidesOpen = state.open.has(sidesKey) || !!edit;
+    const toggle = (k) => () => { state.open.has(k) ? state.open.delete(k) : state.open.add(k); render(); };
+    const hidden = [...buckets].filter(([g, v]) => !DEFAULT_OPEN.has(g) && g !== "Sides" && v.length);
     const dishCount = hidden.reduce((n, [, v]) => n + v.length, 0);
     const extraCount = dishCount + addons.length;
 
     let any = false;
     for (const [g, items] of buckets) {
       if (!items.length) continue;
-      if (!DEFAULT_OPEN.has(g) && !open) continue;
+      if (g === "Sides" && !sidesOpen) {
+        const b = el("button", "more sidesbtn", `+ ${items.length} side${items.length === 1 ? "" : "s"}`);
+        b.onclick = toggle(sidesKey);
+        card.append(b);
+        continue;
+      }
+      if (g !== "Sides" && !DEFAULT_OPEN.has(g) && !open) continue;
       const sec = el("div", "grp");
       if (g !== "Mains") sec.append(el("h4", null, g));
       const ul = el("ul");
       items.forEach((it) => ul.append(itemLi(it, fk)));
       sec.append(ul);
+      if (g === "Sides" && !edit) {
+        const b = el("button", "more sidesbtn", "Hide sides");
+        b.onclick = toggle(sidesKey);
+        sec.append(b);
+      }
       card.append(sec);
       any = true;
     }
@@ -465,10 +480,10 @@
     } else if (open && addons.length) {
       card.append(el("p", "with", "With " + addons.map((it) => it.name).join(", ")));
     }
-    if (!any && !extraCount) card.append(el("p", "none", "Nothing new"));
+    if (!any && !extraCount && !buckets.get("Sides").length) card.append(el("p", "none", "Nothing new"));
     if (extraCount && !edit) {
       const b = el("button", "more", open ? "Less" : dishCount ? `+ ${dishCount} more` : "+ extras");
-      b.onclick = () => { open ? state.open.delete(key) : state.open.add(key); render(); };
+      b.onclick = toggle(key);
       card.append(b);
     }
     if (allBox.checked && staples.length) {
