@@ -1,4 +1,6 @@
 (() => {
+  // PostHog events (index.html loads it); a no-op if it's blocked or missing
+  const track = (event, props) => { try { window.posthog?.capture?.(event, props); } catch (_) {} };
   const TZ = "America/New_York";
   const $ = (s) => document.querySelector(s);
   const grid = $("#grid"), tabs = $("#daytabs"), range = $("#range");
@@ -330,10 +332,11 @@
     const onclick = async (e) => {
       const b = e.currentTarget;
       if (navigator.share) {
-        try { await navigator.share({ title, text: dishes.length ? `${title}: ${dishes.join(", ")}` : title, url }); } catch (_) {}
+        try { await navigator.share({ title, text: dishes.length ? `${title}: ${dishes.join(", ")}` : title, url }); track("meal_shared", { method: "share", meal: meal.name, hall: state.hall.id }); } catch (_) {}
         return;
       }
       try { await navigator.clipboard.writeText(url); } catch (_) { return; }
+      track("meal_shared", { method: "copy", meal: meal.name, hall: state.hall.id });
       b.classList.add("copied");
       const label = b.querySelector("span");
       if (label) label.textContent = "Link copied";
@@ -578,6 +581,7 @@
   allBox.onchange = () => {
     document.body.classList.toggle("showall", allBox.checked);
     try { localStorage.setItem("berg.all", allBox.checked ? "1" : "0"); } catch (_) {}
+    track("show_all_toggled", { on: allBox.checked });
     render();
   };
   // the meal chips for this hall (none for a café with one all-day menu)
@@ -587,7 +591,7 @@
     box.replaceChildren(...MEALS.map((m) => {
       const chip = el("button", "chip", m);
       chip.dataset.meal = m;
-      chip.onclick = () => { state.meal = m; wantMeal = null; state.q = ""; q.value = ""; render(); };
+      chip.onclick = () => { state.meal = m; wantMeal = null; state.q = ""; q.value = ""; render(); track("meal_selected", { meal: m, hall: state.hall.id }); };
       return chip;
     }));
   }
@@ -665,6 +669,7 @@
   function pickHall(h) {
     if (h === state.hall) return;
     try { localStorage.setItem("berg.hall", h.id); } catch (_) {}
+    track("hall_selected", { hall: h.id, from: state.hall.id });
     const sameFile = h.file === state.hall.file;
     const v = state.data && { iso: state.data.weeks[state.week].days[state.day].date, meal: wantMeal || state.meal };
     setHall(h);
@@ -793,8 +798,17 @@
     }
   };
 
-  let timer;
-  q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); }, 120); };
+  let timer, searchTimer, lastSearch = "";
+  // one menu_searched per search, once typing has paused for a while
+  const trackSearch = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      if (!state.q || state.q === lastSearch || !state.data) return;
+      lastSearch = state.q;
+      track("menu_searched", { query: state.q.slice(0, 60), results: countHits(state.data.weeks[state.week]), hall: state.hall.id });
+    }, 1500);
+  };
+  q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim().toLowerCase(); render(); trackSearch(); }, 120); };
   q.onkeydown = (e) => { if (e.key === "Escape") { q.value = ""; state.q = ""; render(); q.blur(); } };
 
   // Keyboard: ←/→ change day on phones and week on desktop (where the whole
@@ -845,7 +859,7 @@
     homeBtn.hidden = false;
     // show only this device's steps; desktops see both
     if (os) homeDlg.querySelectorAll("section").forEach((s) => { s.hidden = s.dataset.os !== os; });
-    homeBtn.onclick = () => homeDlg.showModal();
+    homeBtn.onclick = () => { homeDlg.showModal(); track("home_screen_help_opened", { os: os || "desktop" }); };
     homeDlg.onclick = (e) => { // tap the backdrop to close
       const r = homeDlg.getBoundingClientRect();
       if (e.target === homeDlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) homeDlg.close();
@@ -859,7 +873,7 @@
       await deferred.userChoice;
       deferred = null; installBtn.hidden = true; homeDlg.close();
     };
-    addEventListener("appinstalled", () => { homeBtn.hidden = true; homeDlg.close(); });
+    addEventListener("appinstalled", () => { homeBtn.hidden = true; homeDlg.close(); track("app_installed"); });
   }
 
   // The old michael-han.com/berg/ address redirects here with ?moved=1: ask
