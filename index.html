@@ -144,6 +144,19 @@
       },
     },
     enable_recording_console_log: false,
+    // Errors nobody can act on, never sent: "Script error." with no stack (a script from another origin, in practice a
+    // browser extension, whose details the browser hides), extensions' own errors, and Safari's "Database deleted by
+    // request of the user" (site data cleared while the page was open).
+    before_send: function (e) {
+      var l = e.event == "$exception" && e.properties && e.properties.$exception_list;
+      var noise = !!l && l.length > 0 && l.every(function (x) {
+        var v = String(x.value || ""), fr = (x.stacktrace && x.stacktrace.frames) || [];
+        return (/^Script error\.?$/.test(v) && !fr.length) ||
+          /runtime\.sendMessage|Extension context invalidated|Database deleted by request of the user/.test(v) ||
+          fr.some(function (f) { return /^(safari-web-extension|chrome-extension|moz-extension|webkit-masked-url):/.test(f.filename || f.source || ""); });
+      });
+      return noise ? null : e;
+    },
   });
   posthog.register({ site: "bergmenu", display_mode: matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "installed" : "browser" });
   </script>
