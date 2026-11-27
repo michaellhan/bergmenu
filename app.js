@@ -30,6 +30,8 @@
     ["Breakfast", ["breakfast"]],
   ];
   const DEFAULT_OPEN = new Set(["Mains", "Soup", "Pizza & sandwiches", "Dessert"]);
+  // a meal with at most this many lines shows in full, with no "+" folds
+  const SHORT_CARD = 10;
   const PASTA = "whole grain pasta bar";
   const BREAD = /cornbread|bread|roll|hawaiian|biscuit|cracker|tortilla/i;
   const TOPPING = /topping|sauce|sprinkles|cherry|cherries|fudge|whipped|sugar|^banana$/i;
@@ -441,14 +443,22 @@
     }
     if (pasta.length) buckets.get("Sides").push({ name: "Pasta bar: " + pasta.join(", "), tags: [] });
     const key = d.date + "|" + meal.name;
-    const open = state.open.has(key) || !!edit;
-    // sides get their own toggle, right under the mains they go with
     const sidesKey = key + "|sides";
-    const sidesOpen = state.open.has(sidesKey) || !!edit;
     const toggle = (k) => () => { state.open.has(k) ? state.open.delete(k) : state.open.add(k); render(); };
     const hidden = [...buckets].filter(([g, v]) => !DEFAULT_OPEN.has(g) && g !== "Sides" && v.length);
     const dishCount = hidden.reduce((n, [, v]) => n + v.length, 0);
     const extraCount = dishCount + addons.length;
+    // Only fold things away when the whole meal would make a long card: a
+    // short one just shows everything, and a fold never hides a single line
+    // (the "With" add-ons line counts as one).
+    const sideCount = buckets.get("Sides").length;
+    const shownCount = [...buckets].reduce((n, [g, v]) => n + (DEFAULT_OPEN.has(g) ? v.length : 0), 0);
+    const extraLines = dishCount + (addons.length ? 1 : 0);
+    const short = shownCount + sideCount + extraLines <= SHORT_CARD;
+    const autoSides = short || sideCount <= 1, autoExtras = short || extraLines <= 1;
+    // sides get their own toggle, right under the mains they go with
+    const open = autoExtras || state.open.has(key) || !!edit;
+    const sidesOpen = autoSides || state.open.has(sidesKey) || !!edit;
 
     let any = false;
     for (const [g, items] of buckets) {
@@ -465,7 +475,7 @@
       const ul = el("ul");
       items.forEach((it) => ul.append(itemLi(it, fk)));
       sec.append(ul);
-      if (g === "Sides" && !edit) {
+      if (g === "Sides" && !edit && !autoSides) {
         const b = el("button", "more sidesbtn", "Hide sides");
         b.onclick = toggle(sidesKey);
         sec.append(b);
@@ -484,7 +494,7 @@
       card.append(el("p", "with", "With " + addons.map((it) => it.name).join(", ")));
     }
     if (!any && !extraCount && !buckets.get("Sides").length) card.append(el("p", "none", "Nothing new"));
-    if (extraCount && !edit) {
+    if (extraCount && !edit && !autoExtras) {
       const b = el("button", "more", open ? "Less" : dishCount ? `+ ${dishCount} more` : "+ extras");
       b.onclick = toggle(key);
       card.append(b);
